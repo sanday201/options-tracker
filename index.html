@@ -389,6 +389,7 @@ function computeStats() {
   const hoursElapsed = Math.max(1, (now - yearStart) / (1000*60*60));
   const avgHour = ytdNet / hoursElapsed;
   const maxTrade = allTrades.reduce((m,t) => t.net > m ? t.net : m, 0);
+  const minTrade = allTrades.reduce((m,t) => t.net < m ? t.net : m, 0);
 
   // ticker breakdown
   const tkMap = {};
@@ -443,7 +444,7 @@ function computeStats() {
   });
   tickers.forEach(t => { t.winRate = tkWinMap[t.ticker] ? Math.round(tkWinMap[t.ticker].wins/tkWinMap[t.ticker].total*100) : 0; });
 
-  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, avgHour, maxTrade, tickers, months, cumData, winRate, streak, mtdChange, lastMonthNet, dailyPnL, days };
+  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, avgHour, maxTrade, minTrade, tickers, months, cumData, winRate, streak, mtdChange, lastMonthNet, dailyPnL, days };
 }
 
 function renderKPIs() {
@@ -452,14 +453,13 @@ function renderKPIs() {
   document.getElementById("ytd-big").textContent = fmt(s.ytdNet);
   document.getElementById("ytd-big").style.color = s.ytdNet >= 0 ? "var(--green)" : "var(--red)";
   document.getElementById("header-sub").textContent = `${s.trades} trades · Avg $${s.avgDay.toFixed(0)}/day`;
-  setKPI("k-ytd", fmt(s.ytdNet), "Gross: "+fmt(s.ytdGross));
+  setKPI("k-ytd", fmt(s.ytdNet), "Gross: "+fmt(s.ytdGross)+" · Fees: "+fmt(s.ytdFees));
   setKPI("k-mtd", fmt(s.mtd), "This month");
-  setKPI("k-7d", fmt(s.ltd7), "Last 7 days");
+  setKPI("k-worst", (s.minTrade < 0 ? "-" : "")+"$"+Math.abs(s.minTrade).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}), "Worst trade");
   setKPI("k-trades", s.trades, "Total trades");
   setKPI("k-avg", "$"+s.avgTrade.toFixed(2), "Per trade");
   setKPI("k-max", fmt(s.maxTrade), "Best trade");
   setKPI("k-day", "$"+s.avgDay.toFixed(2), "Per calendar day");
-  setKPI("k-fees", fmt(s.ytdFees), "Total fees");
   setKPI("k-hour", "$"+s.avgHour.toFixed(2), "Per hour (÷24)");
   const winTrades = allTrades.filter(t => t.net > 0).length;
   setKPI("k-winrate", s.winRate+"%", winTrades+" of "+s.trades+" trades");
@@ -604,7 +604,7 @@ function renderLog() {
         <div class="log-ticker">${t.ticker}</div>
         <div class="log-date">${t.date}</div>
       </div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:#444;text-align:center;align-self:center">
+      <div class="log-running" onclick="this.classList.toggle('visible');this.style.color=this.classList.contains('visible')?'#555':'transparent'" style="font-family:var(--font-mono);font-size:10px;color:transparent;text-align:center;align-self:center;cursor:pointer;transition:color .2s;user-select:none" title="Tap to reveal">
         ∑ $${t.running.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
       </div>
       <div style="text-align:right">
@@ -871,6 +871,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .log-gross{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
 .del-btn{background:none;border:none;color:var(--dim);font-size:15px;cursor:pointer;padding:4px;border-radius:6px}
 .log-row{position:relative;overflow:hidden;transition:transform .25s ease}
+.log-running.visible{color:#555 !important}
 .log-row.swiping{background:rgba(255,107,107,0.12)}
 .swipe-hint{position:absolute;right:0;top:0;bottom:0;width:70px;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0;transition:opacity .2s;border-radius:0 10px 10px 0;pointer-events:none}
 
@@ -907,6 +908,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .banner-goal{background:linear-gradient(90deg,rgba(255,190,11,0.12),rgba(0,245,160,0.08));border-bottom:1px solid rgba(255,190,11,0.2);color:var(--yellow);animation:pulse-banner 2s ease-in-out infinite}
 @keyframes pulse-banner{0%,100%{opacity:1}50%{opacity:0.7}}
 .banner-close{background:none;border:none;color:inherit;opacity:0.5;font-size:16px;cursor:pointer;padding:0 4px;margin-left:4px}
+.log-running.visible{color:#444 !important}
 
 /* TOAST */
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-90px);background:var(--green);color:#070910;font-family:var(--font-mono);font-size:12px;font-weight:700;padding:10px 22px;border-radius:30px;z-index:999;transition:transform .3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;pointer-events:none}
@@ -1032,7 +1034,7 @@ service cloud.firestore {
   <!-- HEADER -->
   <div class="header">
     <div class="header-top">
-      <div class="header-label">● LIVE · 2026</div>
+      <div class="header-label" style="opacity:0">·</div>
       <div class="user-row">
         <img id="user-photo" src="" alt="" style="display:none"/>
         <span id="user-name"></span>
@@ -1082,10 +1084,10 @@ service cloud.firestore {
         <div class="kpi-val" style="color:var(--cyan)">-</div>
         <div class="kpi-sub">-</div>
       </div>
-      <div class="kpi" id="k-7d">
-        <div class="kpi-glow" style="background:radial-gradient(circle at top right,rgba(245,162,0,0.15) 0%,transparent 70%)"></div>
-        <div class="kpi-label">Last 7 Days</div>
-        <div class="kpi-val" style="color:var(--amber)">-</div>
+      <div class="kpi" id="k-worst">
+        <div class="kpi-glow" style="background:radial-gradient(circle at top right,rgba(255,107,107,0.15) 0%,transparent 70%)"></div>
+        <div class="kpi-label">Worst Trade</div>
+        <div class="kpi-val" style="color:var(--red)">-</div>
         <div class="kpi-sub">-</div>
       </div>
       <div class="kpi" id="k-trades">
@@ -1112,12 +1114,7 @@ service cloud.firestore {
         <div class="kpi-val" style="color:var(--blue)">-</div>
         <div class="kpi-sub">-</div>
       </div>
-      <div class="kpi" id="k-fees">
-        <div class="kpi-glow" style="background:radial-gradient(circle at top right,rgba(251,86,7,0.15) 0%,transparent 70%)"></div>
-        <div class="kpi-label">Total Fees</div>
-        <div class="kpi-val" style="color:#fb5607">-</div>
-        <div class="kpi-sub">-</div>
-      </div>
+
       <div class="kpi" id="k-hour">
         <div class="kpi-glow" style="background:radial-gradient(circle at top right,rgba(0,191,165,0.15) 0%,transparent 70%)"></div>
         <div class="kpi-label">Avg / Hour</div>
@@ -1130,7 +1127,7 @@ service cloud.firestore {
         <div class="kpi-val" style="color:var(--green)">-</div>
         <div class="kpi-sub">-</div>
       </div>
-      <div class="kpi" id="k-streak" style="grid-column:1/-1">
+      <div class="kpi" id="k-streak">
         <div class="kpi-glow" style="background:radial-gradient(circle at top right,rgba(255,190,11,0.15) 0%,transparent 70%)"></div>
         <div class="kpi-label">Green Day Streak</div>
         <div class="kpi-val" style="color:var(--yellow)">-</div>
@@ -1164,10 +1161,7 @@ service cloud.firestore {
       <div class="chart-title">Daily P&amp;L</div>
       <div class="chart-wrap" style="height:200px"><canvas id="daily-chart"></canvas></div>
     </div>
-    <div class="chart-card">
-      <div class="chart-title">Top Tickers — % of YTD</div>
-      <div style="height:260px;position:relative"><canvas id="pie-chart"></canvas></div>
-    </div>
+
   </div>
 
   <!-- ── LOG PAGE ── -->

@@ -379,6 +379,7 @@ function computeStats() {
   const firstDate = allTrades[0]?.date;
   const days = firstDate ? Math.max(1, Math.ceil((now - new Date(firstDate))/(1000*60*60*24))) : 1;
   const avgDay = ytdNet / days;
+  const avgHour = avgDay / 24;
   const maxTrade = allTrades.reduce((m,t) => t.net > m ? t.net : m, 0);
 
   // ticker breakdown
@@ -403,7 +404,7 @@ function computeStats() {
   let cumul = 0;
   const cumData = allTrades.map(t => { cumul += t.net; return { date: t.date, val: cumul }; });
 
-  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, maxTrade, tickers, months, cumData };
+  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, avgHour, maxTrade, tickers, months, cumData };
 }
 
 function renderKPIs() {
@@ -420,6 +421,7 @@ function renderKPIs() {
   setKPI("k-max", fmt(s.maxTrade), "Best trade");
   setKPI("k-day", "$"+s.avgDay.toFixed(2), "Per day");
   setKPI("k-fees", fmt(s.ytdFees), "Total fees");
+  setKPI("k-hour", "$"+s.avgHour.toFixed(2), "Per trading hour");
 }
 
 function setKPI(id, val, sub) {
@@ -576,12 +578,32 @@ function setupUI() {
   });
 }
 
+
+window.toggleSign = () => {
+  const input = document.getElementById("f-gross");
+  const btn = document.getElementById("sign-toggle");
+  const val = parseFloat(input.value) || 0;
+  if (btn.textContent === "+") {
+    btn.textContent = "−";
+    btn.style.color = "var(--red)";
+    btn.style.borderColor = "rgba(255,107,107,0.3)";
+    if (val > 0) input.value = (-val).toString();
+  } else {
+    btn.textContent = "+";
+    btn.style.color = "var(--green)";
+    btn.style.borderColor = "rgba(255,255,255,0.12)";
+    if (val < 0) input.value = Math.abs(val).toString();
+  }
+};
+
 window.openModal = () => {
   document.getElementById("trade-modal").classList.add("open");
   document.getElementById("f-ticker").focus();
 };
 window.closeModal = () => {
   document.getElementById("trade-modal").classList.remove("open");
+  const btn = document.getElementById("sign-toggle");
+  if (btn) { btn.textContent = "+"; btn.style.color = "var(--green)"; btn.style.borderColor = "rgba(255,255,255,0.12)"; }
 };
 
 function showToast(msg, isErr=false) {
@@ -900,6 +922,12 @@ service cloud.firestore {
         <div class="kpi-val" style="color:#fb5607">-</div>
         <div class="kpi-sub">-</div>
       </div>
+      <div class="kpi" id="k-hour" style="grid-column:1/-1">
+        <div class="kpi-glow" style="background:radial-gradient(circle at top right,rgba(0,191,165,0.15) 0%,transparent 70%)"></div>
+        <div class="kpi-label">Avg / Hour</div>
+        <div class="kpi-val" style="color:#00bfa5">-</div>
+        <div class="kpi-sub">-</div>
+      </div>
     </div>
 
     <div class="chart-card">
@@ -973,7 +1001,10 @@ service cloud.firestore {
         </div>
         <div class="form-group">
           <label class="form-label">Gross Premium ($)</label>
-          <input id="f-gross" class="form-input" type="number" placeholder="0.00" step="0.01" inputmode="decimal"/>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="sign-toggle" onclick="toggleSign()" style="flex-shrink:0;width:46px;height:46px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#00f5a0;font-size:24px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+            <input id="f-gross" class="form-input" type="number" placeholder="0.00" step="0.01" inputmode="decimal" style="flex:1"/>
+          </div>
         </div>
       </div>
 

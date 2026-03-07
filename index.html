@@ -7,7 +7,9 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Options Tracker"/>
 <title>Options Tracker</title>
+<link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIk9wdGlvbnMgVHJhY2tlciIsCiAgInNob3J0X25hbWUiOiAiT3B0aW9ucyIsCiAgInN0YXJ0X3VybCI6ICIvb3B0aW9ucy10cmFja2VyLyIsCiAgInNjb3BlIjogIi9vcHRpb25zLXRyYWNrZXIvIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjMDcwOTEwIiwKICAidGhlbWVfY29sb3IiOiAiIzA3MDkxMCIsCiAgIm9yaWVudGF0aW9uIjogInBvcnRyYWl0IiwKICAiaWNvbnMiOiBbeyJzcmMiOiAiaHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3NhbmRheTIwMS9vcHRpb25zLXRyYWNrZXIvbWFpbi9pY29uLnBuZyIsICJzaXplcyI6ICIxOTJ4MTkyIiwgInR5cGUiOiAiaW1hZ2UvcG5nIn1dCn0="/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
@@ -461,6 +463,7 @@ function renderKPIs() {
   setKPI("k-streak", s.streak+" days", s.streak > 0 ? "🔥 Green streak" : "No active streak");
   const mtdSign = s.mtdChange >= 0 ? "+" : "";
   setKPI("k-mtd", fmt(s.mtd), mtdSign+s.mtdChange.toFixed(1)+"% vs last month");
+  updateDailyBanner();
 }
 
 function setKPI(id, val, sub) {
@@ -662,6 +665,65 @@ window.toggleSign = () => {
   }
 };
 
+
+// ── BANNER LOGIC ──
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (!localStorage.getItem("banner-install-dismissed")) {
+    document.getElementById("banner-install").classList.add("show");
+  }
+});
+
+window.addEventListener("appinstalled", () => {
+  document.getElementById("banner-install").classList.remove("show");
+  deferredInstallPrompt = null;
+});
+
+window.triggerInstall = async () => {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === "accepted") {
+      document.getElementById("banner-install").classList.remove("show");
+      deferredInstallPrompt = null;
+    }
+  }
+};
+
+window.dismissBanner = (id) => {
+  document.getElementById(id).classList.remove("show");
+  localStorage.setItem(id+"-dismissed", "1");
+};
+
+function updateDailyBanner() {
+  const today = new Date().toISOString().slice(0,10);
+  const todayTrades = allTrades.filter(t => t.date === today);
+  const todayNet = todayTrades.reduce((s,t) => s + t.net, 0);
+  const DAILY_GOAL = 1000;
+
+  const bannerEl = document.getElementById("banner-daily");
+  const textEl = document.getElementById("banner-daily-text");
+  const goalEl = document.getElementById("banner-goal");
+  const goalText = document.getElementById("banner-goal-text");
+
+  if (todayTrades.length > 0) {
+    const sign = todayNet >= 0 ? "+" : "";
+    textEl.textContent = `Today: ${sign}$${todayNet.toLocaleString("en-US",{minimumFractionDigits:2})} across ${todayTrades.length} trade${todayTrades.length>1?"s":""}`;
+    bannerEl.className = "banner banner-daily show" + (todayNet < 0 ? " red" : "");
+    
+    // Goal banner
+    if (todayNet >= DAILY_GOAL && !localStorage.getItem("goal-dismissed-"+today)) {
+      goalText.textContent = `🎯 Daily goal reached! +$${todayNet.toLocaleString("en-US",{minimumFractionDigits:2})} today`;
+      goalEl.classList.add("show");
+    }
+  } else {
+    bannerEl.classList.remove("show");
+  }
+}
+
 // Swipe to delete on log rows
 function addSwipeListeners() {
   document.querySelectorAll(".log-row[data-id]").forEach(row => {
@@ -815,6 +877,18 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .submit-btn{width:100%;padding:15px;background:linear-gradient(135deg,var(--green),var(--cyan));border:none;border-radius:12px;color:#070910;font-family:var(--font-display);font-size:16px;font-weight:800;cursor:pointer;transition:opacity .15s}
 .submit-btn:active{opacity:.85}
 
+/* ── BANNERS ── */
+.banner{display:none;align-items:center;gap:10px;padding:10px 16px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.5px;cursor:pointer}
+.banner.show{display:flex}
+.banner-install{background:linear-gradient(90deg,rgba(0,245,160,0.12),rgba(0,217,245,0.12));border-bottom:1px solid rgba(0,245,160,0.2);color:var(--green)}
+.banner-install span{flex:1}
+.banner-install .banner-btn{background:var(--green);color:#070910;border:none;border-radius:8px;padding:5px 12px;font-family:var(--font-mono);font-size:10px;font-weight:800;cursor:pointer}
+.banner-daily{background:linear-gradient(90deg,rgba(0,217,245,0.1),rgba(58,134,255,0.1));border-bottom:1px solid rgba(0,217,245,0.15);color:var(--cyan)}
+.banner-daily.red{background:linear-gradient(90deg,rgba(255,107,107,0.1),rgba(255,107,107,0.05));border-bottom:1px solid rgba(255,107,107,0.2);color:var(--red)}
+.banner-goal{background:linear-gradient(90deg,rgba(255,190,11,0.12),rgba(0,245,160,0.08));border-bottom:1px solid rgba(255,190,11,0.2);color:var(--yellow);animation:pulse-banner 2s ease-in-out infinite}
+@keyframes pulse-banner{0%,100%{opacity:1}50%{opacity:0.7}}
+.banner-close{background:none;border:none;color:inherit;opacity:0.5;font-size:16px;cursor:pointer;padding:0 4px;margin-left:4px}
+
 /* TOAST */
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-90px);background:var(--green);color:#070910;font-family:var(--font-mono);font-size:12px;font-weight:700;padding:10px 22px;border-radius:30px;z-index:999;transition:transform .3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;pointer-events:none}
 .toast.show{transform:translateX(-50%) translateY(0)}
@@ -949,6 +1023,21 @@ service cloud.firestore {
     <div class="header-title">Options <span style="color:var(--green)">Tracker</span></div>
     <div id="ytd-big" class="ytd-big">$0.00</div>
     <div id="header-sub" class="header-sub">Loading...</div>
+  </div>
+
+  <!-- BANNERS -->
+  <div class="banner banner-install" id="banner-install">
+    <span>📲 Install for full screen — no address bar</span>
+    <button class="banner-btn" onclick="triggerInstall()">Install</button>
+    <button class="banner-close" onclick="dismissBanner('banner-install')">✕</button>
+  </div>
+  <div class="banner banner-daily" id="banner-daily">
+    <span id="banner-daily-text">Today: loading...</span>
+    <button class="banner-close" onclick="dismissBanner('banner-daily')">✕</button>
+  </div>
+  <div class="banner banner-goal" id="banner-goal">
+    <span id="banner-goal-text">🎯 Daily goal reached!</span>
+    <button class="banner-close" onclick="dismissBanner('banner-goal')">✕</button>
   </div>
 
   <!-- NAV -->

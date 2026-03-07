@@ -672,10 +672,13 @@ let deferredInstallPrompt = null;
 window.addEventListener("beforeinstallprompt", e => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  if (!localStorage.getItem("banner-install-dismissed")) {
-    document.getElementById("banner-install").classList.add("show");
-  }
 });
+
+// Always show install banner unless dismissed or already standalone
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+if (!isStandalone && !localStorage.getItem("banner-install-dismissed")) {
+  document.getElementById("banner-install").classList.add("show");
+}
 
 window.addEventListener("appinstalled", () => {
   document.getElementById("banner-install").classList.remove("show");
@@ -700,8 +703,6 @@ window.dismissBanner = (id) => {
 
 function updateDailyBanner() {
   const today = new Date().toISOString().slice(0,10);
-  const todayTrades = allTrades.filter(t => t.date === today);
-  const todayNet = todayTrades.reduce((s,t) => s + t.net, 0);
   const DAILY_GOAL = 1000;
 
   const bannerEl = document.getElementById("banner-daily");
@@ -709,18 +710,26 @@ function updateDailyBanner() {
   const goalEl = document.getElementById("banner-goal");
   const goalText = document.getElementById("banner-goal-text");
 
-  if (todayTrades.length > 0) {
-    const sign = todayNet >= 0 ? "+" : "";
-    textEl.textContent = `Today: ${sign}$${todayNet.toLocaleString("en-US",{minimumFractionDigits:2})} across ${todayTrades.length} trade${todayTrades.length>1?"s":""}`;
-    bannerEl.className = "banner banner-daily show" + (todayNet < 0 ? " red" : "");
-    
-    // Goal banner
-    if (todayNet >= DAILY_GOAL && !localStorage.getItem("goal-dismissed-"+today)) {
-      goalText.textContent = `🎯 Daily goal reached! +$${todayNet.toLocaleString("en-US",{minimumFractionDigits:2})} today`;
-      goalEl.classList.add("show");
-    }
-  } else {
-    bannerEl.classList.remove("show");
+  // Group by day
+  const dayMap = {};
+  allTrades.forEach(t => { if (!t.date) return; if (!dayMap[t.date]) dayMap[t.date] = []; dayMap[t.date].push(t); });
+  const sortedDates = Object.keys(dayMap).sort();
+  const latestDate = sortedDates[sortedDates.length - 1];
+  if (!latestDate) return;
+
+  const isToday = latestDate === today;
+  const trades = dayMap[latestDate];
+  const net = trades.reduce((s,t) => s + t.net, 0);
+  const sign = net >= 0 ? "+" : "";
+  const label = isToday ? "Today" : latestDate.slice(5).replace("-","/");
+
+  textEl.textContent = `${label}: ${sign}$${net.toLocaleString("en-US",{minimumFractionDigits:2})} · ${trades.length} trade${trades.length>1?"s":""}`;
+  bannerEl.className = "banner banner-daily show" + (net < 0 ? " red" : "");
+
+  // Goal banner — only for today
+  if (isToday && net >= DAILY_GOAL && !localStorage.getItem("goal-dismissed-"+today)) {
+    goalText.textContent = `🎯 Daily goal reached! ${sign}$${net.toLocaleString("en-US",{minimumFractionDigits:2})} today`;
+    goalEl.classList.add("show");
   }
 }
 

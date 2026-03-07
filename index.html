@@ -381,8 +381,9 @@ function computeStats() {
   const ltd7 = allTrades.filter(t => t.date >= weekStr).reduce((s,t) => s + t.net, 0);
   const trades = allTrades.length;
   const avgTrade = trades ? ytdNet/trades : 0;
-  const firstDate = allTrades[0]?.date;
-  const days = firstDate ? Math.max(1, Math.ceil((now - new Date(firstDate))/(1000*60*60*24))) : 1;
+  // Always calculate from Jan 1 12:00 AM of the current year
+  const yearStart = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+  const days = Math.max(1, Math.ceil((now - yearStart) / (1000*60*60*24)));
   const avgDay = ytdNet / days;
   const avgHour = avgDay / 24;
   const maxTrade = allTrades.reduce((m,t) => t.net > m ? t.net : m, 0);
@@ -455,9 +456,9 @@ function renderKPIs() {
   setKPI("k-trades", s.trades, "Total trades");
   setKPI("k-avg", "$"+s.avgTrade.toFixed(2), "Per trade");
   setKPI("k-max", fmt(s.maxTrade), "Best trade");
-  setKPI("k-day", "$"+s.avgDay.toFixed(2), "Per day");
+  setKPI("k-day", "$"+s.avgDay.toFixed(2), "Per calendar day");
   setKPI("k-fees", fmt(s.ytdFees), "Total fees");
-  setKPI("k-hour", "$"+s.avgHour.toFixed(2), "Per hour (24h)");
+  setKPI("k-hour", "$"+s.avgHour.toFixed(2), "Per hour (÷24)");
   const winTrades = allTrades.filter(t => t.net > 0).length;
   setKPI("k-winrate", s.winRate+"%", winTrades+" of "+s.trades+" trades");
   setKPI("k-streak", s.streak+" days", s.streak > 0 ? "🔥 Green streak" : "No active streak");

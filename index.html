@@ -693,7 +693,14 @@ window.triggerInstall = async () => {
       document.getElementById("banner-install").classList.remove("show");
       deferredInstallPrompt = null;
     }
+  } else {
+    // Show manual instructions overlay
+    document.getElementById("install-overlay").style.display = "flex";
   }
+};
+
+window.closeInstallOverlay = () => {
+  document.getElementById("install-overlay").style.display = "none";
 };
 
 window.dismissBanner = (id) => {
@@ -1223,5 +1230,28 @@ service cloud.firestore {
 
 </div><!-- end app-screen -->
 
+
+<!-- INSTALL INSTRUCTIONS OVERLAY -->
+<div id="install-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:24px">
+  <div style="background:#0f1520;border:1px solid rgba(0,245,160,0.2);border-radius:20px;padding:24px;max-width:340px;width:100%">
+    <div style="font-family:var(--font-display);font-size:18px;font-weight:800;color:var(--green);margin-bottom:4px">Install App</div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:#666;margin-bottom:20px">Remove the address bar forever</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#070910;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
+        <div style="font-family:var(--font-mono);font-size:12px;color:#ccc;line-height:1.5">Tap the <strong style="color:#fff">⋮ menu</strong> at the top right of Chrome</div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#070910;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
+        <div style="font-family:var(--font-mono);font-size:12px;color:#ccc;line-height:1.5">Tap <strong style="color:#fff">"Add to Home screen"</strong></div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#070910;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>
+        <div style="font-family:var(--font-mono);font-size:12px;color:#ccc;line-height:1.5">Tap <strong style="color:#fff">Add</strong> on the popup — then always open from your home screen icon</div>
+      </div>
+    </div>
+    <button onclick="closeInstallOverlay()" style="width:100%;margin-top:20px;padding:13px;background:linear-gradient(135deg,var(--green),var(--cyan));border:none;border-radius:12px;color:#070910;font-family:var(--font-display);font-size:15px;font-weight:800;cursor:pointer">Got it!</button>
+  </div>
+</div>
 </body>
 </html>

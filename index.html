@@ -381,11 +381,13 @@ function computeStats() {
   const ltd7 = allTrades.filter(t => t.date >= weekStr).reduce((s,t) => s + t.net, 0);
   const trades = allTrades.length;
   const avgTrade = trades ? ytdNet/trades : 0;
-  // Always calculate from Jan 1 12:00 AM of the current year
+  // Calendar days from Jan 1 (inclusive) to tomorrow — matches Excel YTD day count
   const yearStart = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
-  const days = Math.max(1, Math.ceil((now - yearStart) / (1000*60*60*24)));
+  const days = Math.max(1, Math.floor((now - yearStart) / (1000*60*60*24)) + 2);
   const avgDay = ytdNet / days;
-  const avgHour = avgDay / 24;
+  // Avg/hour = exact hours elapsed since Jan 1 12:00 AM
+  const hoursElapsed = Math.max(1, (now - yearStart) / (1000*60*60));
+  const avgHour = ytdNet / hoursElapsed;
   const maxTrade = allTrades.reduce((m,t) => t.net > m ? t.net : m, 0);
 
   // ticker breakdown
@@ -441,7 +443,7 @@ function computeStats() {
   });
   tickers.forEach(t => { t.winRate = tkWinMap[t.ticker] ? Math.round(tkWinMap[t.ticker].wins/tkWinMap[t.ticker].total*100) : 0; });
 
-  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, avgHour, maxTrade, tickers, months, cumData, winRate, streak, mtdChange, lastMonthNet, dailyPnL };
+  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, avgHour, maxTrade, tickers, months, cumData, winRate, streak, mtdChange, lastMonthNet, dailyPnL, days };
 }
 
 function renderKPIs() {

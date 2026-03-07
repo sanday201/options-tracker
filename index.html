@@ -407,7 +407,38 @@ function computeStats() {
   let cumul = 0;
   const cumData = allTrades.map(t => { cumul += t.net; return { date: t.date, val: cumul }; });
 
-  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, avgHour, maxTrade, tickers, months, cumData };
+  // win rate
+  const winTrades = allTrades.filter(t => t.net > 0).length;
+  const winRate = trades > 0 ? Math.round((winTrades / trades) * 100) : 0;
+
+  // green day streak
+  const dayMap = {};
+  allTrades.forEach(t => { if (!t.date) return; dayMap[t.date] = (dayMap[t.date]||0) + t.net; });
+  const sortedDays = Object.entries(dayMap).sort((a,b) => a[0].localeCompare(b[0]));
+  let streak = 0;
+  for (let i = sortedDays.length - 1; i >= 0; i--) {
+    if (sortedDays[i][1] > 0) streak++; else break;
+  }
+
+  // MTD vs last month
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthKey = prevMonthDate.toISOString().slice(0,7);
+  const lastMonthNet = allTrades.filter(t => t.date?.startsWith(prevMonthKey)).reduce((s,t) => s + t.net, 0);
+  const mtdChange = lastMonthNet !== 0 ? ((mtd - lastMonthNet) / Math.abs(lastMonthNet) * 100) : 0;
+
+  // daily P&L
+  const dailyPnL = sortedDays.map(([date, val]) => ({ date: date.slice(5), val }));
+
+  // ticker win rates
+  const tkWinMap = {};
+  allTrades.forEach(t => {
+    if (!tkWinMap[t.ticker]) tkWinMap[t.ticker] = {wins:0, total:0};
+    tkWinMap[t.ticker].total++;
+    if (t.net > 0) tkWinMap[t.ticker].wins++;
+  });
+  tickers.forEach(t => { t.winRate = tkWinMap[t.ticker] ? Math.round(tkWinMap[t.ticker].wins/tkWinMap[t.ticker].total*100) : 0; });
+
+  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, avgHour, maxTrade, tickers, months, cumData, winRate, streak, mtdChange, lastMonthNet, dailyPnL };
 }
 
 function renderKPIs() {

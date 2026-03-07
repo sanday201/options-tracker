@@ -424,7 +424,12 @@ function renderKPIs() {
   setKPI("k-max", fmt(s.maxTrade), "Best trade");
   setKPI("k-day", "$"+s.avgDay.toFixed(2), "Per day");
   setKPI("k-fees", fmt(s.ytdFees), "Total fees");
-  setKPI("k-hour", "$"+s.avgHour.toFixed(2), "Per trading hour");
+  setKPI("k-hour", "$"+s.avgHour.toFixed(2), "Per hour (24h)");
+  const winTrades = allTrades.filter(t => t.net > 0).length;
+  setKPI("k-winrate", s.winRate+"%", winTrades+" of "+s.trades+" trades");
+  setKPI("k-streak", s.streak+" days", s.streak > 0 ? "🔥 Green streak" : "No active streak");
+  const mtdSign = s.mtdChange >= 0 ? "+" : "";
+  setKPI("k-mtd", fmt(s.mtd), mtdSign+s.mtdChange.toFixed(1)+"% vs last month");
 }
 
 function setKPI(id, val, sub) {

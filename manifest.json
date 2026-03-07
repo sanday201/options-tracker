@@ -1,0 +1,17 @@
+{
+  "name": "Options Tracker",
+  "short_name": "Options",
+  "start_url": "/options-tracker/",
+  "scope": "/options-tracker/",
+  "display": "standalone",
+  "background_color": "#070910",
+  "theme_color": "#070910",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/sanday201/options-tracker/main/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

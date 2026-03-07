@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <title>Options Tracker</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap&subset=latin" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <!-- ╔══════════════════════════════════════════════════════════╗
@@ -39,7 +39,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp }
+import { getFirestore, collection, addDoc, getDocs, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ⬇️ PASTE YOUR FIREBASE CONFIG HERE
@@ -85,8 +85,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
 // ── SEED HISTORICAL DATA ──────────────────────────────────────
 async function seedHistoricalData(uid) {
-  const SEED_KEY = "seeded_v3";
+  const SEED_KEY = "seeded_v4";
   if (localStorage.getItem(SEED_KEY)) return;
+  // Also check Firestore — don't seed if trades already exist
+  const existing = await getDocs(query(collection(db, `users/${uid}/trades`), orderBy("date","asc")));
+  if (existing.size > 0) { localStorage.setItem(SEED_KEY, "1"); return; }
 
   // All 181 real trades from your Robinhood Excel (Jan–Mar 2026)
   const raw = [
@@ -604,7 +607,7 @@ function showSetupScreen() {
   --green:#00f5a0;--cyan:#00d9f5;--amber:#f5a200;--purple:#c77dff;
   --red:#ff6b6b;--blue:#3a86ff;--yellow:#ffbe0b;
   --text:#fff;--muted:#888;--dim:#444;
-  --font-display:'Syne',sans-serif;--font-mono:'Space Mono',monospace;--font-body:'DM Sans',sans-serif;
+  --font-display:'Syne','SF Pro Display','Segoe UI',system-ui,sans-serif;--font-mono:'Space Mono','SF Mono','Courier New',monospace;--font-body:'DM Sans','SF Pro Text','Segoe UI',system-ui,sans-serif;
 }
 body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;overflow-x:hidden;padding-bottom:80px}
 

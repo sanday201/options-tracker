@@ -604,7 +604,7 @@ function renderLog() {
         <div class="log-ticker">${t.ticker}</div>
         <div class="log-date">${t.date}</div>
       </div>
-      <div class="log-running" onclick="this.classList.toggle('visible');this.style.color=this.classList.contains('visible')?'#555':'transparent'" style="font-family:var(--font-mono);font-size:10px;color:transparent;text-align:center;align-self:center;cursor:pointer;transition:color .2s;user-select:none" title="Tap to reveal">
+      <div style="font-family:var(--font-mono);font-size:10px;color:#444;text-align:center;align-self:center">
         ∑ $${t.running.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
       </div>
       <div style="text-align:right">
@@ -823,16 +823,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .nav-btn.active{color:var(--green);border-bottom-color:var(--green);background:rgba(0,245,160,0.05)}
 
 /* HEADER */
-.header{padding:20px 16px 16px;background:linear-gradient(180deg,rgba(0,245,160,0.07) 0%,transparent 100%);border-bottom:1px solid rgba(0,245,160,0.1)}
-.header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.header{padding:10px 16px 12px;background:linear-gradient(180deg,rgba(0,245,160,0.07) 0%,transparent 100%);border-bottom:1px solid rgba(0,245,160,0.1)}
+.header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .header-label{font-family:var(--font-mono);font-size:10px;color:var(--green);letter-spacing:3px}
 .user-row{display:flex;align-items:center;gap:8px}
 #user-photo{width:28px;height:28px;border-radius:50%;border:2px solid var(--green);object-fit:cover}
 #user-name{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
 .signout-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;color:var(--dim);font-family:var(--font-mono);font-size:10px;cursor:pointer;transition:color .15s}
 .signout-btn:active{color:var(--red)}
-.header-title{font-family:var(--font-display);font-size:24px;font-weight:800;line-height:1.1}
-.ytd-big{font-family:var(--font-display);font-size:40px;font-weight:800;color:var(--green);margin-top:8px;line-height:1}
+.header-title{font-family:var(--font-display);font-size:24px;font-weight:800;line-height:1.1;margin-top:0}
+.ytd-big{font-family:var(--font-display);font-size:40px;font-weight:800;color:var(--green);margin-top:4px;line-height:1}
 .header-sub{font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-top:4px}
 
 /* PAGES */
@@ -1034,7 +1034,6 @@ service cloud.firestore {
   <!-- HEADER -->
   <div class="header">
     <div class="header-top">
-      <div class="header-label" style="opacity:0">·</div>
       <div class="user-row">
         <img id="user-photo" src="" alt="" style="display:none"/>
         <span id="user-name"></span>

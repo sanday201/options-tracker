@@ -375,7 +375,8 @@ function renderAll() {
   renderCharts();
   renderHeatmap();
   renderMilestones();
-  renderLog();
+  // Only rebuild log bar if not already built, always refresh items
+  if (!document.getElementById("log-items-list")) { renderLog(); } else { renderLogItems(); }
   renderTickers();
   setTimeout(bindGoalButtons, 100);
 }
@@ -1164,39 +1165,40 @@ function showMilestonePop(ms, curVal) {
 // ══════════════════════════════════════════
 // FEATURE: LOG SEARCH & FILTER
 // ══════════════════════════════════════════
-window.logSearch = "";
-window.logFilter = "all"; // all | wins | losses
-let logSearch = window.logSearch;
-let logFilter = window.logFilter;
+// log state — single source of truth
+const logState = { search: "", filter: "all" };
 
 function renderLog() {
   const container = document.getElementById("log-list");
   if (!container) return;
-
-  // Build search bar HTML at top
-  const searchBar = `
-    <div class="log-search-bar">
-      <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." value="${logSearch}" id="log-search-input" oninput="logSearch=this.value;window.logSearch=this.value;renderLogItems()" />
-      <button class="log-filter-btn ${logFilter==='all'?'active':''}" onclick="setLogFilter('all')">All</button>
-      <button class="log-filter-btn ${logFilter==='wins'?'active':''}" onclick="setLogFilter('wins')">Wins</button>
-      <button class="log-filter-btn ${logFilter==='losses'?'active-red':''}" onclick="setLogFilter('losses')">Losses</button>
-    </div>
-    <div id="log-items-list"></div>
-  `;
-  container.innerHTML = searchBar;
+  // Only build search bar once — check if already exists
+  if (!document.getElementById("log-items-list")) {
+    container.innerHTML = `
+      <div class="log-search-bar">
+        <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." />
+        <button class="log-filter-btn active" id="lf-all" onclick="setLogFilter('all')">All</button>
+        <button class="log-filter-btn" id="lf-wins" onclick="setLogFilter('wins')">Wins</button>
+        <button class="log-filter-btn" id="lf-losses" onclick="setLogFilter('losses')">Losses</button>
+      </div>
+      <div id="log-items-list"></div>`;
+    const inp = document.getElementById("log-search-input");
+    if (inp) inp.addEventListener("input", function() {
+      logState.search = this.value;
+      renderLogItems();
+    });
+  }
   renderLogItems();
 }
 
 function setLogFilter(f) {
-  logFilter = f;
-  window.logFilter = f;
-  // Update button states manually
-  document.querySelectorAll(".log-filter-btn").forEach(b => {
-    b.classList.remove("active","active-red");
-    if (b.textContent.trim()==="All" && f==="all") b.classList.add("active");
-    if (b.textContent.trim()==="Wins" && f==="wins") b.classList.add("active");
-    if (b.textContent.trim()==="Losses" && f==="losses") b.classList.add("active-red");
-  });
+  logState.filter = f;
+  document.getElementById("lf-all")?.classList.toggle("active", f==="all");
+  document.getElementById("lf-wins")?.classList.toggle("active", f==="wins");
+  document.getElementById("lf-losses")?.classList.toggle("active-red", f==="losses");
+  document.getElementById("lf-wins")?.classList.toggle("active", f==="wins");
+  document.getElementById("lf-losses")?.classList.remove("active");
+  if (f==="all"||f==="wins") document.getElementById("lf-losses")?.classList.remove("active-red");
+  if (f==="all"||f==="losses") document.getElementById("lf-wins")?.classList.remove("active");
   renderLogItems();
 }
 
@@ -1204,10 +1206,11 @@ function renderLogItems() {
   const container = document.getElementById("log-items-list");
   if (!container) return;
   const sorted = [...allTrades].reverse();
-  const q = logSearch.toLowerCase().trim();
+  const q = (logState.search||"").toLowerCase().trim();
+  const f = logState.filter || "all";
   const filtered = sorted.filter(t => {
     const matchQ = !q || (t.ticker||"").toLowerCase().includes(q);
-    const matchF = logFilter==="all" || (logFilter==="wins" && t.net>0) || (logFilter==="losses" && t.net<=0);
+    const matchF = f==="all" || (f==="wins" && t.net>0) || (f==="losses" && t.net<=0);
     return matchQ && matchF;
   });
   if (filtered.length===0) {
@@ -1250,7 +1253,7 @@ function setupUI() {
       document.getElementById("page-" + btn.dataset.page).classList.add("active");
       if (btn.dataset.page === "log") renderLog();
       if (btn.dataset.page === "charts") renderHeatmap();
-      if (btn.dataset.page === "tickers") renderMilestones();
+
     });
   });
 
@@ -2018,7 +2021,9 @@ service cloud.firestore {
       <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)">Loading...</div>
     </div>
 
-        <div class="chart-card cal-section">
+        <div id="milestones-section"></div>
+
+    <div class="chart-card cal-section">
       <div class="cal-hdr">
         <div class="cal-title" id="cal-month-title">This Month</div>
         <div class="cal-legend">
@@ -2046,9 +2051,6 @@ service cloud.firestore {
       <div id="ticker-tbody"></div>
     </div>
   </div>
-
-  <!-- ── MILESTONES ── -->
-  <div id="milestones-section"></div>
 
   <!-- ── CHARTS PAGE ── -->
   <div class="page" id="page-charts">

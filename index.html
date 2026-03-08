@@ -375,7 +375,7 @@ function renderAll() {
   renderCharts();
   renderMilestones();
   // Only rebuild log bar if not already built, always refresh items
-  if (!document.getElementById("log-items-list")) { renderLog(); } else { renderLogItems(); }
+  renderLogItems(); // renderAll only refreshes items, bar persists from nav click
   renderTickers();
   setTimeout(bindGoalButtons, 100);
 }
@@ -1187,25 +1187,30 @@ function showMilestonePop(ms, curVal) {
 // log state — single source of truth
 const logState = { search: "", filter: "all" };
 
-function renderLog() {
+function buildLogBar() {
   const container = document.getElementById("log-list");
   if (!container) return;
-  // Only build search bar once — check if already exists
-  if (!document.getElementById("log-items-list")) {
-    container.innerHTML = `
-      <div class="log-search-bar">
-        <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." />
-        <button class="log-filter-btn active" id="lf-all" onclick="setLogFilter('all')">All</button>
-        <button class="log-filter-btn" id="lf-wins" onclick="setLogFilter('wins')">Wins</button>
-        <button class="log-filter-btn" id="lf-losses" onclick="setLogFilter('losses')">Losses</button>
-      </div>
-      <div id="log-items-list"></div>`;
-    const inp = document.getElementById("log-search-input");
-    if (inp) inp.addEventListener("input", function() {
-      logState.search = this.value;
-      renderLogItems();
-    });
-  }
+  container.innerHTML = `
+    <div class="log-search-bar">
+      <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." />
+      <button class="log-filter-btn" id="lf-all">All</button>
+      <button class="log-filter-btn" id="lf-wins">Wins</button>
+      <button class="log-filter-btn" id="lf-losses">Losses</button>
+    </div>
+    <div id="log-items-list"></div>`;
+  document.getElementById("log-search-input").addEventListener("input", function() {
+    logState.search = this.value;
+    renderLogItems();
+  });
+  document.getElementById("lf-all").addEventListener("click", function() { setLogFilter("all"); });
+  document.getElementById("lf-wins").addEventListener("click", function() { setLogFilter("wins"); });
+  document.getElementById("lf-losses").addEventListener("click", function() { setLogFilter("losses"); });
+  setLogFilter(logState.filter); // apply current state to buttons
+}
+
+function renderLog() {
+  // Always rebuild the bar — guarantees fresh listeners every time
+  buildLogBar();
   renderLogItems();
 }
 

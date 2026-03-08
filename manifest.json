@@ -1,17 +1,27 @@
 {
   "name": "Options Tracker",
   "short_name": "Options",
+  "description": "Personal options premium tracker",
   "start_url": "/options-tracker/",
   "scope": "/options-tracker/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#070910",
   "theme_color": "#070910",
   "orientation": "portrait",
+  "categories": ["finance"],
   "icons": [
     {
       "src": "https://raw.githubusercontent.com/sanday201/options-tracker/main/icon.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/sanday201/options-tracker/main/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

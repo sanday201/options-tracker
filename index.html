@@ -369,7 +369,12 @@ function renderAll() {
   renderCalendar();
   renderTickerTape();
   renderKPIs();
+  renderSparkline();
+  renderBestDay();
+  renderPersonalRecords();
   renderCharts();
+  renderHeatmap();
+  renderMilestones();
   renderLog();
   renderTickers();
   setTimeout(bindGoalButtons, 100);
@@ -450,7 +455,41 @@ function computeStats() {
   });
   tickers.forEach(t => { t.winRate = tkWinMap[t.ticker] ? Math.round(tkWinMap[t.ticker].wins/tkWinMap[t.ticker].total*100) : 0; });
 
-  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, avgHour, maxTrade, minTrade, tickers, months, cumData, winRate, streak, mtdChange, lastMonthNet, dailyPnL, days };
+
+  // ── best day / week / month ──
+  const dayTotals = Object.entries(dayMap).map(([date,net]) => ({date,net})).sort((a,b)=>b.net-a.net);
+  const bestDay = dayTotals[0] || {date:"-",net:0};
+  const worstDay = dayTotals[dayTotals.length-1] || {date:"-",net:0};
+
+  // best week
+  const weekMap = {};
+  allTrades.forEach(t => {
+    if (!t.date) return;
+    const d = new Date(t.date+"T12:00:00");
+    const weekStart = new Date(d); weekStart.setDate(d.getDate() - d.getDay());
+    const wk = weekStart.toISOString().slice(0,10);
+    weekMap[wk] = (weekMap[wk]||0) + t.net;
+  });
+  const weekTotals = Object.entries(weekMap).sort((a,b)=>b[1]-a[1]);
+  const bestWeek = weekTotals[0] ? {date:weekTotals[0][0], net:weekTotals[0][1]} : {date:"-",net:0};
+
+  // best month
+  const bestMonth = months.length ? [...months].sort((a,b)=>b[1]-a[1])[0] : ["-",0];
+
+  // last 7 days net per day for sparkline
+  const last7 = [];
+  for (let i=6; i>=0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const dk = d.toISOString().slice(0,10);
+    last7.push(dayMap[dk]||0);
+  }
+  const last7net = last7.reduce((s,v)=>s+v,0);
+
+  // trade heatmap: last 12 weeks (Mon-Fri), count trades per day
+  const heatmap = {};
+  allTrades.forEach(t => { if (t.date) heatmap[t.date] = (heatmap[t.date]||0) + 1; });
+
+  return { ytdNet, ytdGross, ytdFees, mtd, ltd7, trades, avgTrade, avgDay, avgHour, maxTrade, minTrade, tickers, months, cumData, winRate, streak, mtdChange, lastMonthNet, dailyPnL, days, bestDay, worstDay, bestWeek, bestMonth, last7, last7net, heatmap };
 }
 
 
@@ -846,27 +885,297 @@ function renderCharts() {
   }
 }
 
+
+// ══════════════════════════════════════════
+// FEATURE: BEST DAY EVER BANNER
+// ══════════════════════════════════════════
+function renderBestDay() {
+  const s = computeStats();
+  const el = document.getElementById("best-day-card");
+  if (!el) return;
+  const fmt = n => "$" + Math.abs(n).toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
+  const allBest = localStorage.getItem("allTimeBestDay");
+  const prevBest = allBest ? JSON.parse(allBest) : null;
+  const isNewRecord = prevBest && s.bestDay.net > prevBest.net;
+  if (!prevBest || s.bestDay.net > (prevBest.net||0)) {
+    localStorage.setItem("allTimeBestDay", JSON.stringify({net: s.bestDay.net, date: s.bestDay.date}));
+  }
+  // Get 2nd best day from dayMap
+  const dayTotals2 = Object.entries(
+    (() => { const dm = {}; allTrades.forEach(t => { if (t.date) dm[t.date] = (dm[t.date]||0) + t.net; }); return dm; })()
+  ).map(([date,net]) => ({date,net})).sort((a,b) => b.net - a.net);
+  const secondBest = dayTotals2[1] || {date:"-",net:0};
+  el.innerHTML = `
+    <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:#888;margin-bottom:6px">🏆 All-Time Best Trading Day</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end">
+      <div>
+        <div style="font-size:26px;font-weight:800;color:var(--yellow)">${fmt(s.bestDay.net)}</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--dim);margin-top:3px">${s.bestDay.date}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)">2nd best</div>
+        <div style="font-size:15px;font-weight:800;color:#555">${fmt(secondBest.net)}</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:#2a2a2a">${secondBest.date}</div>
+      </div>
+    </div>
+    <div class="best-day-beat ${isNewRecord ? 'new-record-flash' : ''}">
+      ${isNewRecord ? '🎊 NEW RECORD JUST SET!' : '🎯 Beat ' + fmt(s.bestDay.net) + ' to set a new record!'}
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════
+// FEATURE: PERSONAL RECORDS
+// ══════════════════════════════════════════
+function renderPersonalRecords() {
+  const s = computeStats();
+  const el = document.getElementById("personal-records-card");
+  if (!el) return;
+  const fmt = n => (n>=0?"+":"") + "$" + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtShort = n => "$" + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0});
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const bestMonthName = s.bestMonth[0] !== "-" ? monthNames[parseInt(s.bestMonth[0].split("-")[1])-1] + " " + s.bestMonth[0].split("-")[0] : "-";
+  const records = [
+    {icon:"🏆", label:"Best Day", val:fmtShort(s.bestDay.net), sub:s.bestDay.date, color:"var(--yellow)"},
+    {icon:"📅", label:"Best Week", val:fmtShort(s.bestWeek.net), sub:"w/o " + s.bestWeek.date.slice(5), color:"var(--green)"},
+    {icon:"📆", label:"Best Month", val:fmtShort(s.bestMonth[1]||0), sub:bestMonthName, color:"var(--cyan)"},
+    {icon:"⚡", label:"Best Trade", val:fmtShort(s.maxTrade), sub:"Single trade", color:"var(--purple)"},
+    {icon:"🔥", label:"Win Streak", val:s.streak + " days", sub:"Current streak", color:"var(--amber)"},
+    {icon:"💀", label:"Worst Day", val:"-" + fmtShort(Math.abs(s.worstDay.net)), sub:s.worstDay.date, color:"var(--red)"},
+  ];
+  el.innerHTML = `
+    <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:12px">Personal Records</div>
+    <div class="records-grid">
+      ${records.map(r => `
+        <div class="rec-cell">
+          <div class="rec-icon">${r.icon}</div>
+          <div class="rec-label">${r.label}</div>
+          <div class="rec-val" style="color:${r.color}">${r.val}</div>
+          <div class="rec-sub">${r.sub}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════
+// FEATURE: 7-DAY SPARKLINE IN HEADER
+// ══════════════════════════════════════════
+function renderSparkline() {
+  const s = computeStats();
+  const el = document.getElementById("header-sparkline");
+  if (!el || !s.last7) return;
+  const days = s.last7;
+  const max = Math.max(...days.map(Math.abs), 1);
+  const w = 72, h = 24;
+  const pts = days.map((v,i) => {
+    const x = (i / (days.length-1)) * w;
+    const y = h/2 - (v/max)*(h/2-2);
+    return x+","+y;
+  }).join(" ");
+  const net7 = s.last7net;
+  const sign = net7>=0?"+":"-";
+  const color = net7>=0?"var(--green)":"var(--red)";
+  el.innerHTML = `
+    <div class="sparkline-wrap">
+      <div class="sparkline-label">LAST 7 DAYS</div>
+      <svg width="${w}" height="${h}" style="display:block;overflow:visible">
+        <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        ${days.map((v,i)=>{
+          const x=(i/(days.length-1))*w;
+          const y=h/2-(v/max)*(h/2-2);
+          return `<circle cx="${x}" cy="${y}" r="2" fill="${v>=0?'var(--green)':'var(--red)'}"/>`;
+        }).join("")}
+      </svg>
+      <div class="sparkline-net" style="color:${color}">${sign}$${Math.abs(net7).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════
+// FEATURE: TRADE FREQUENCY HEATMAP
+// ══════════════════════════════════════════
+function renderHeatmap() {
+  const s = computeStats();
+  const el = document.getElementById("heatmap-section");
+  if (!el) return;
+  const today = new Date();
+  const weeks = 14;
+  const dayLabels = ["S","M","T","W","T","F","S"];
+  // Build columns: each column = one week (Sun-Sat)
+  // Start from 'weeks' weeks ago Sunday
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - (today.getDay()) - (weeks-1)*7);
+
+  const cols = [];
+  for (let w=0; w<weeks; w++) {
+    const col = [];
+    for (let d=0; d<7; d++) {
+      const dt = new Date(startDate);
+      dt.setDate(startDate.getDate() + w*7 + d);
+      const dk = dt.toISOString().slice(0,10);
+      col.push({date:dk, count:s.heatmap[dk]||0, day:d});
+    }
+    cols.push(col);
+  }
+
+  const getColor = n => {
+    if (n===0) return "rgba(255,255,255,0.04)";
+    if (n>=5) return "rgba(0,245,160,0.85)";
+    if (n>=3) return "rgba(0,245,160,0.5)";
+    if (n>=1) return "rgba(0,245,160,0.22)";
+    return "rgba(255,255,255,0.04)";
+  };
+
+  el.innerHTML = `
+    <div class="heatmap-card">
+      <div class="heatmap-title">Trade Frequency · Last ${weeks} Weeks</div>
+      <div style="display:flex;align-items:flex-start;gap:3px">
+        <div class="heatmap-day-labels">
+          ${dayLabels.map((d,i)=>`<div class="hm-day-lbl">${i%2===1?d:""}</div>`).join("")}
+        </div>
+        <div class="heatmap-grid">
+          ${cols.map(col=>`
+            <div class="heatmap-col">
+              ${col.map(cell=>`
+                <div class="hm-cell" style="background:${getColor(cell.count)}">
+                  <div class="hm-tip">${cell.date}: ${cell.count} trade${cell.count!==1?"s":""}</div>
+                </div>
+              `).join("")}
+            </div>
+          `).join("")}
+        </div>
+      </div>
+      <div class="heatmap-legend">
+        <span class="hm-leg-lbl">Less</span>
+        ${[0,1,2,4,6].map(v=>`<div style="width:10px;height:10px;border-radius:2px;background:${getColor(v)}"></div>`).join("")}
+        <span class="hm-leg-lbl">More</span>
+      </div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════
+// FEATURE: MILESTONE CELEBRATIONS
+// ══════════════════════════════════════════
+function renderMilestones() {
+  const s = computeStats();
+  const el = document.getElementById("milestones-section");
+  if (!el) return;
+  const milestones = [25000,50000,75000,100000,150000,200000];
+  const fmt = n => "$" + n.toLocaleString("en-US");
+  const fmtShort = n => "$" + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0});
+
+  // Check if newly crossed any milestone
+  milestones.forEach(ms => {
+    const key = "ms_celebrated_" + ms;
+    if (s.ytdNet >= ms && !localStorage.getItem(key)) {
+      localStorage.setItem(key, "1");
+      showMilestonePop(ms, fmtShort(s.ytdNet));
+    }
+  });
+
+  el.innerHTML = `
+    <div class="chart-card">
+      <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:12px">YTD Milestones</div>
+      <div class="milestone-list">
+        ${milestones.map(ms => {
+          const done = s.ytdNet >= ms;
+          const pct = Math.min(100, (s.ytdNet/ms)*100);
+          return `
+            <div class="ms-row" style="opacity:${done?1:0.4}" onclick="${done?'showMilestonePop('+ms+',"'+fmt(ms)+'")':''}">
+              <div class="ms-circle" style="background:${done?'rgba(0,245,160,0.12)':'rgba(255,255,255,0.04)'};border:2px solid ${done?'var(--green)':'rgba(255,255,255,0.08)'}">
+                ${done?'✓':'○'}
+              </div>
+              <div class="ms-info">
+                <div class="ms-val" style="color:${done?'var(--green)':'#444'}">${fmt(ms)}</div>
+                ${done?`<div class="ms-sub">✓ Reached!</div>`:`<div class="ms-sub" style="color:#2a2a2a">${fmtShort(ms-s.ytdNet)} away · ${pct.toFixed(0)}%</div>`}
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function showMilestonePop(ms, curVal) {
+  const existing = document.getElementById("ms-popup-overlay");
+  if (existing) existing.remove();
+  const div = document.createElement("div");
+  div.className = "ms-popup";
+  div.id = "ms-popup-overlay";
+  div.innerHTML = `
+    <div class="ms-popup-inner">
+      <div style="font-size:48px;margin-bottom:8px">🎊</div>
+      <div style="font-size:22px;font-weight:800;color:var(--green);margin-bottom:4px">$${Number(ms).toLocaleString()} Milestone!</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-bottom:20px">You're at ${curVal} YTD. Keep going!</div>
+      <button onclick="document.getElementById('ms-popup-overlay').remove()" style="width:100%;padding:12px;background:var(--green);border:none;border-radius:12px;color:#070910;font-family:var(--font-display);font-size:14px;font-weight:800;cursor:pointer">Let's go! 🚀</button>
+    </div>
+  `;
+  div.addEventListener("click", e => { if (e.target===div) div.remove(); });
+  document.body.appendChild(div);
+  if (navigator.vibrate) navigator.vibrate([50,30,50,30,100]);
+  launchConfetti();
+}
+
+// ══════════════════════════════════════════
+// FEATURE: LOG SEARCH & FILTER
+// ══════════════════════════════════════════
+let logSearch = "";
+let logFilter = "all"; // all | wins | losses
+
 function renderLog() {
   const container = document.getElementById("log-list");
   if (!container) return;
+
+  // Build search bar HTML at top
+  const searchBar = `
+    <div class="log-search-bar">
+      <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." value="${logSearch}" oninput="logSearch=this.value;renderLogItems()" />
+      <button class="log-filter-btn ${logFilter==='all'?'active':''}" onclick="setLogFilter('all')">All</button>
+      <button class="log-filter-btn ${logFilter==='wins'?'active':''}" onclick="setLogFilter('wins')">Wins</button>
+      <button class="log-filter-btn ${logFilter==='losses'?'active-red':''}" onclick="setLogFilter('losses')">Losses</button>
+    </div>
+    <div id="log-items-list"></div>
+  `;
+  container.innerHTML = searchBar;
+  renderLogItems();
+}
+
+function setLogFilter(f) {
+  logFilter = f;
+  renderLog();
+}
+
+function renderLogItems() {
+  const container = document.getElementById("log-items-list");
+  if (!container) return;
   const sorted = [...allTrades].reverse();
-  if (sorted.length === 0) {
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--dim);font-family:var(--font-mono);font-size:12px">No trades yet.<br>Tap + to add your first trade.</div>`;
+  const q = logSearch.toLowerCase().trim();
+  const filtered = sorted.filter(t => {
+    const matchQ = !q || (t.ticker||"").toLowerCase().includes(q);
+    const matchF = logFilter==="all" || (logFilter==="wins" && t.net>0) || (logFilter==="losses" && t.net<=0);
+    return matchQ && matchF;
+  });
+  if (filtered.length===0) {
+    container.innerHTML = `<div class="log-empty">No trades match your filter.</div>`;
     return;
   }
-  // compute running total from oldest to newest, then display reversed
+  // compute running totals for full sorted list
   let running = 0;
-  const withRunning = [...allTrades].map(t => { running += t.net; return {...t, running}; });
-  container.innerHTML = withRunning.reverse().map(t => {
+  const runMap = {};
+  [...allTrades].forEach(t => { running += t.net; runMap[t.id] = running; });
+  container.innerHTML = filtered.map(t => {
     const net = t.net;
-    const col = net >= 0 ? "var(--green)" : "var(--red)";
+    const col = net>=0?"var(--green)":"var(--red)";
     return `<div class="log-row" data-id="${t.id}">
       <div>
         <div class="log-ticker">${t.ticker}</div>
         <div class="log-date">${t.date}</div>
       </div>
       <div style="font-family:var(--font-mono);font-size:10px;color:#444;text-align:center;align-self:center">
-        ∑ $${t.running.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
+        ∑ $${(runMap[t.id]||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
       </div>
       <div style="text-align:right">
         <div class="log-net" style="color:${col}">${net>=0?"+":""}$${Math.abs(net).toLocaleString("en-US",{minimumFractionDigits:2})}</div>
@@ -876,6 +1185,7 @@ function renderLog() {
     </div>`;
   }).join("");
 }
+
 
 // ── UI HELPERS ─────────────────────────────────────────────────
 function setupUI() {
@@ -887,6 +1197,8 @@ function setupUI() {
       btn.classList.add("active");
       document.getElementById("page-" + btn.dataset.page).classList.add("active");
       if (btn.dataset.page === "log") renderLog();
+      if (btn.dataset.page === "charts") renderHeatmap();
+      if (btn.dataset.page === "tickers") renderMilestones();
     });
   });
 
@@ -1186,6 +1498,63 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .goal-modal-save{flex:1;padding:13px;background:var(--green);border:none;border-radius:12px;color:#070910;font-family:var(--font-display);font-size:14px;font-weight:800;cursor:pointer}
 .goal-modal-cancel{padding:13px 20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:var(--muted);font-family:var(--font-mono);font-size:13px;cursor:pointer}
 
+
+/* ── BEST DAY BANNER ── */
+.best-day-card{background:linear-gradient(135deg,rgba(255,190,11,0.08),rgba(255,190,11,0.02));border:1px solid rgba(255,190,11,0.2);border-radius:16px;padding:14px 15px;margin-bottom:10px;position:relative;overflow:hidden}
+.best-day-card::before{content:"";position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(255,190,11,0.2),transparent);pointer-events:none}
+.best-day-beat{margin-top:10px;background:rgba(255,190,11,0.08);border:1px solid rgba(255,190,11,0.2);border-radius:10px;padding:8px 12px;font-family:var(--font-mono);font-size:10px;color:var(--yellow);animation:pulse-banner 2s ease-in-out infinite}
+.new-record-flash{background:linear-gradient(135deg,rgba(255,190,11,0.2),rgba(0,245,160,0.1));border:1px solid var(--yellow);animation:pulse-banner 1s ease-in-out infinite}
+
+/* ── PERSONAL RECORDS ── */
+.records-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.rec-cell{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px 11px}
+.rec-icon{font-size:16px;margin-bottom:4px}
+.rec-label{font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:3px}
+.rec-val{font-size:14px;font-weight:800}
+.rec-sub{font-family:var(--font-mono);font-size:8px;color:#2a2a2a;margin-top:2px}
+
+/* ── 7-DAY SPARKLINE ── */
+.sparkline-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.sparkline-label{font-family:var(--font-mono);font-size:8px;color:var(--dim);text-align:right}
+.sparkline-net{font-family:var(--font-mono);font-size:9px;font-weight:700;text-align:right}
+
+/* ── HEATMAP ── */
+.heatmap-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.heatmap-title{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:10px}
+.heatmap-grid{display:flex;gap:2px;overflow-x:auto;padding-bottom:4px}
+.heatmap-col{display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+.hm-cell{width:11px;height:11px;border-radius:2px;cursor:pointer;transition:transform .1s;position:relative;flex-shrink:0}
+.hm-cell:hover{transform:scale(1.4)}
+.hm-cell:active{transform:scale(1.4)}
+.hm-tip{position:absolute;bottom:130%;left:50%;transform:translateX(-50%);background:#0d1422;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 8px;font-family:var(--font-mono);font-size:8px;color:#fff;white-space:nowrap;z-index:30;display:none;pointer-events:none}
+.hm-cell:hover .hm-tip,.hm-cell:active .hm-tip{display:block}
+.heatmap-day-labels{display:flex;flex-direction:column;gap:2px;margin-right:4px;flex-shrink:0}
+.hm-day-lbl{height:11px;font-family:var(--font-mono);font-size:7px;color:#2a2a2a;line-height:11px}
+.heatmap-legend{display:flex;align-items:center;gap:5px;margin-top:8px}
+.hm-leg-lbl{font-family:var(--font-mono);font-size:8px;color:var(--dim)}
+
+/* ── MILESTONES ── */
+.milestone-list{display:flex;flex-direction:column;gap:8px}
+.ms-row{display:flex;align-items:center;gap:10px;cursor:pointer;padding:4px 0;transition:opacity .15s}
+.ms-circle{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;transition:transform .15s}
+.ms-row:active .ms-circle{transform:scale(1.15)}
+.ms-info{flex:1}
+.ms-val{font-size:15px;font-weight:800}
+.ms-sub{font-family:var(--font-mono);font-size:9px;color:var(--dim);margin-top:1px}
+.ms-away{font-family:var(--font-mono);font-size:9px;color:#222}
+.ms-popup{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.ms-popup-inner{background:#0d1422;border:1px solid var(--green);border-radius:20px;padding:28px 24px;text-align:center;max-width:280px;animation:pop-in .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop-in{from{transform:scale(0.7);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ── LOG SEARCH ── */
+.log-search-bar{display:flex;gap:8px;margin-bottom:10px;padding:0 0 10px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.log-search-input{flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:9px 12px;color:#fff;font-family:var(--font-mono);font-size:11px;outline:none;transition:border-color .2s}
+.log-search-input:focus{border-color:rgba(0,245,160,0.4)}
+.log-filter-btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:9px 12px;color:var(--dim);font-family:var(--font-mono);font-size:10px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.log-filter-btn.active{background:rgba(0,245,160,0.1);border-color:rgba(0,245,160,0.3);color:var(--green)}
+.log-filter-btn.active-red{background:rgba(255,107,107,0.1);border-color:rgba(255,107,107,0.3);color:var(--red)}
+.log-empty{text-align:center;padding:32px;color:var(--dim);font-family:var(--font-mono);font-size:11px}
+
 /* ── LOGIN ── */
 #login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px;gap:24px;background:radial-gradient(ellipse at top,rgba(0,245,160,0.08) 0%,transparent 60%)}
 .login-logo{font-family:var(--font-display);font-size:48px;font-weight:800;color:var(--green);line-height:1}
@@ -1437,8 +1806,7 @@ service cloud.firestore {
         <button class="signout-btn" onclick="signOutUser()">Sign out</button>
       </div>
     </div>
-    <div id="ytd-big" class="ytd-big skeleton">···</div>
-    <div id="header-sub" class="header-sub">Loading...</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div style="flex:1"><div id="ytd-big" class="ytd-big skeleton">···</div><div id="header-sub" class="header-sub">Loading...</div></div><div id="header-sparkline" class="sparkline-wrap"></div></div>
   </div>
 
   <!-- BANNERS -->
@@ -1588,7 +1956,17 @@ service cloud.firestore {
 
 
     <!-- P&L CALENDAR -->
-    <div class="chart-card cal-section">
+    <!-- BEST DAY EVER -->
+    <div class="best-day-card" id="best-day-card">
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)">Loading...</div>
+    </div>
+
+    <!-- PERSONAL RECORDS -->
+    <div class="kpi" id="personal-records-card" style="margin-bottom:10px;background:linear-gradient(135deg,rgba(255,190,11,0.05),rgba(199,125,255,0.03));border-color:rgba(255,190,11,0.1)">
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)">Loading...</div>
+    </div>
+
+        <div class="chart-card cal-section">
       <div class="cal-hdr">
         <div class="cal-title" id="cal-month-title">This Month</div>
         <div class="cal-legend">
@@ -1617,8 +1995,12 @@ service cloud.firestore {
     </div>
   </div>
 
+  <!-- ── MILESTONES ── -->
+  <div id="milestones-section"></div>
+
   <!-- ── CHARTS PAGE ── -->
   <div class="page" id="page-charts">
+    <div id="heatmap-section"></div>
     <div class="chart-card">
       <div class="chart-title">Cumulative Net Premium</div>
       <div class="chart-wrap"><canvas id="line-chart"></canvas></div>

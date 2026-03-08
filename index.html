@@ -372,6 +372,7 @@ function renderAll() {
   renderCharts();
   renderLog();
   renderTickers();
+  setTimeout(bindGoalButtons, 100);
 }
 
 function computeStats() {
@@ -1046,6 +1047,37 @@ function showSetupScreen() {
   document.getElementById("setup-screen").style.display = "flex";
   document.getElementById("app-screen").style.display = "none";
 }
+
+// ── GOAL MODAL EVENT LISTENERS ──
+document.addEventListener("DOMContentLoaded", function() {
+  // bind immediately on load
+  bindGoalButtons();
+});
+// also bind after a short delay in case DOM not ready
+setTimeout(bindGoalButtons, 500);
+
+function bindGoalButtons() {
+  const editBtn = document.getElementById("goal-edit-btn");
+  const cancelBtn = document.getElementById("goal-modal-cancel");
+  const saveBtn = document.getElementById("goal-modal-save");
+  const overlay = document.getElementById("goal-modal-overlay");
+  if (editBtn && !editBtn._bound) {
+    editBtn._bound = true;
+    editBtn.addEventListener("click", function(e) { e.stopPropagation(); editGoal(); });
+  }
+  if (cancelBtn && !cancelBtn._bound) {
+    cancelBtn._bound = true;
+    cancelBtn.addEventListener("click", closeGoalModal);
+  }
+  if (saveBtn && !saveBtn._bound) {
+    saveBtn._bound = true;
+    saveBtn.addEventListener("click", saveGoal);
+  }
+  if (overlay && !overlay._bound) {
+    overlay._bound = true;
+    overlay.addEventListener("click", function(e) { if (e.target === overlay) closeGoalModal(); });
+  }
+}
 </script>
 
 <style>
@@ -1116,7 +1148,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .ptr-spin{width:16px;height:16px;border:2px solid rgba(0,245,160,0.2);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 .ptr-label{font-family:var(--font-mono);font-size:10px;color:var(--green)}
 
-.cal-section{margin-top:14px}
+.cal-section{margin-top:14px}.cal-body-wrap{max-width:320px}
 .cal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .cal-title{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted)}
 .cal-legend{display:flex;gap:8px;align-items:center}
@@ -1124,8 +1156,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .cal-leg-lbl{font-family:var(--font-mono);font-size:8px;color:var(--dim)}
 .cal-wk-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px}
 .cal-wk-day{font-family:var(--font-mono);font-size:8px;color:#2a2a2a;text-align:center}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.cal-day{height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:9px;font-weight:700;cursor:pointer;position:relative;transition:transform .12s;-webkit-tap-highlight-color:transparent}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;max-width:100%}
+.cal-day{height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer;position:relative;transition:transform .12s;-webkit-tap-highlight-color:transparent;user-select:none}
 .cal-day:active{transform:scale(1.2)}
 .cal-day.cd-empty{background:transparent}
 .cal-day.cd-none{background:rgba(255,255,255,0.02);color:#1a1a1a}
@@ -1469,7 +1501,7 @@ service cloud.firestore {
     <div class="goal-card">
       <div class="goal-hdr-row">
         <div class="goal-title">Annual Goal</div>
-        <button class="goal-edit-btn" onclick="editGoal()">✏ Edit</button>
+        <button class="goal-edit-btn" id="goal-edit-btn">✏ Edit</button>
       </div>
       <div class="goal-nums">
         <div class="goal-cur" id="goal-cur">$0</div>
@@ -1565,8 +1597,8 @@ service cloud.firestore {
           <div class="cal-leg-dot" style="background:rgba(0,245,160,0.7)"></div><span class="cal-leg-lbl">Big</span>
         </div>
       </div>
-      <div class="cal-wk-hdr"><div class="cal-wk-day">S</div><div class="cal-wk-day">M</div><div class="cal-wk-day">T</div><div class="cal-wk-day">W</div><div class="cal-wk-day">T</div><div class="cal-wk-day">F</div><div class="cal-wk-day">S</div></div>
-      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-body-wrap"><div class="cal-wk-hdr"><div class="cal-wk-day">S</div><div class="cal-wk-day">M</div><div class="cal-wk-day">T</div><div class="cal-wk-day">W</div><div class="cal-wk-day">T</div><div class="cal-wk-day">F</div><div class="cal-wk-day">S</div></div>
+      <div class="cal-grid" id="cal-grid"></div></div>
     </div>
 
     <div class="chart-card">
@@ -1686,13 +1718,13 @@ service cloud.firestore {
   </div>
 </div>
 <!-- GOAL EDIT MODAL — at body level so nothing clips it -->
-<div class="goal-modal-overlay" id="goal-modal-overlay" onclick="if(event.target===this)closeGoalModal()">
+<div class="goal-modal-overlay" id="goal-modal-overlay">
   <div class="goal-modal-sheet">
     <div class="goal-modal-title">🎯 Set Annual Goal</div>
     <input class="goal-modal-input" id="goal-modal-input" type="number" inputmode="numeric" placeholder="200000" value="200000"/>
     <div class="goal-modal-btns">
-      <button class="goal-modal-cancel" onclick="closeGoalModal()">Cancel</button>
-      <button class="goal-modal-save" onclick="saveGoal()">Save Goal</button>
+      <button class="goal-modal-cancel" id="goal-modal-cancel">Cancel</button>
+      <button class="goal-modal-save" id="goal-modal-save">Save Goal</button>
     </div>
   </div>
 </div>

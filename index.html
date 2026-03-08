@@ -609,11 +609,24 @@ function renderPaceAndGoal() {
 
 function editGoal() {
   const cur = localStorage.getItem("goalTarget") || "200000";
-  const input = prompt("Set your annual goal ($):", cur);
-  if (input && !isNaN(input) && parseFloat(input) > 0) {
-    goalTarget = parseFloat(input);
+  const inp = document.getElementById("goal-modal-input");
+  if (inp) inp.value = cur;
+  const overlay = document.getElementById("goal-modal-overlay");
+  if (overlay) { overlay.classList.add("open"); setTimeout(() => inp && inp.focus(), 100); }
+}
+function closeGoalModal() {
+  const overlay = document.getElementById("goal-modal-overlay");
+  if (overlay) overlay.classList.remove("open");
+}
+function saveGoal() {
+  const inp = document.getElementById("goal-modal-input");
+  const val = inp ? parseFloat(inp.value) : NaN;
+  if (!isNaN(val) && val > 0) {
+    goalTarget = val;
     localStorage.setItem("goalTarget", goalTarget);
     renderPaceAndGoal();
+    closeGoalModal();
+    showToast("✓ Goal updated!");
   }
 }
 
@@ -1112,7 +1125,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .cal-wk-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px}
 .cal-wk-day{font-family:var(--font-mono);font-size:8px;color:#2a2a2a;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.cal-day{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:9px;font-weight:700;cursor:pointer;position:relative;transition:transform .12s;-webkit-tap-highlight-color:transparent}
+.cal-day{height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:9px;font-weight:700;cursor:pointer;position:relative;transition:transform .12s;-webkit-tap-highlight-color:transparent}
 .cal-day:active{transform:scale(1.2)}
 .cal-day.cd-empty{background:transparent}
 .cal-day.cd-none{background:rgba(255,255,255,0.02);color:#1a1a1a}
@@ -1122,12 +1135,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .cal-day.cd-g4{background:rgba(0,245,160,0.7);color:#070910}
 .cal-day.cd-r{background:rgba(255,107,107,0.28);color:var(--red)}
 .cal-day.cd-today{box-shadow:0 0 0 2px var(--green)}
-.cal-tip{position:absolute;bottom:115%;left:50%;transform:translateX(-50%);background:#0d1422;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:5px 9px;font-family:var(--font-mono);font-size:8px;white-space:nowrap;z-index:20;display:none;pointer-events:none}
+.cal-tip{position:absolute;bottom:115%;left:50%;transform:translateX(-50%);background:#0d1422;border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:5px 9px;font-family:var(--font-mono);font-size:8px;white-space:nowrap;z-index:20;display:none;pointer-events:none;color:#fff}
 .cal-day:hover .cal-tip,.cal-day:active .cal-tip{display:block}
 
 .tape-sym{font-family:var(--font-mono);font-size:10px;font-weight:700;color:#ccc}
 .tape-val{font-family:var(--font-mono);font-size:10px}
 .tape-pos{color:var(--green)}.tape-neg{color:var(--red)}
+
+
+/* ── GOAL EDIT MODAL ── */
+.goal-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
+.goal-modal-overlay.open{display:flex}
+.goal-modal-sheet{background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:440px}
+.goal-modal-title{font-family:var(--font-display);font-size:16px;font-weight:800;color:var(--green);margin-bottom:16px}
+.goal-modal-input{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px;color:#fff;font-family:var(--font-mono);font-size:18px;font-weight:700;text-align:center;outline:none;margin-bottom:14px}
+.goal-modal-input:focus{border-color:var(--green);box-shadow:0 0 0 2px rgba(0,245,160,0.15)}
+.goal-modal-btns{display:flex;gap:10px}
+.goal-modal-save{flex:1;padding:13px;background:var(--green);border:none;border-radius:12px;color:#070910;font-family:var(--font-display);font-size:14px;font-weight:800;cursor:pointer}
+.goal-modal-cancel{padding:13px 20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:var(--muted);font-family:var(--font-mono);font-size:13px;cursor:pointer}
 
 /* ── LOGIN ── */
 #login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px;gap:24px;background:radial-gradient(ellipse at top,rgba(0,245,160,0.08) 0%,transparent 60%)}
@@ -1576,6 +1601,19 @@ service cloud.firestore {
   <!-- ── LOG PAGE ── -->
   <div class="page" id="page-log">
     <div id="log-list"></div>
+  </div>
+
+
+  <!-- GOAL EDIT MODAL -->
+  <div class="goal-modal-overlay" id="goal-modal-overlay" onclick="if(event.target===this)closeGoalModal()">
+    <div class="goal-modal-sheet">
+      <div class="goal-modal-title">🎯 Set Annual Goal</div>
+      <input class="goal-modal-input" id="goal-modal-input" type="number" inputmode="numeric" placeholder="200000" value="200000"/>
+      <div class="goal-modal-btns">
+        <button class="goal-modal-cancel" onclick="closeGoalModal()">Cancel</button>
+        <button class="goal-modal-save" onclick="saveGoal()">Save Goal</button>
+      </div>
+    </div>
   </div>
 
   <!-- ADD TRADE BUTTON -->

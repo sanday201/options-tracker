@@ -1144,7 +1144,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 
 
 /* ── GOAL EDIT MODAL ── */
-.goal-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
+.goal-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
 .goal-modal-overlay.open{display:flex}
 .goal-modal-sheet{background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:440px}
 .goal-modal-title{font-family:var(--font-display);font-size:16px;font-weight:800;color:var(--green);margin-bottom:16px}
@@ -1604,18 +1604,6 @@ service cloud.firestore {
   </div>
 
 
-  <!-- GOAL EDIT MODAL -->
-  <div class="goal-modal-overlay" id="goal-modal-overlay" onclick="if(event.target===this)closeGoalModal()">
-    <div class="goal-modal-sheet">
-      <div class="goal-modal-title">🎯 Set Annual Goal</div>
-      <input class="goal-modal-input" id="goal-modal-input" type="number" inputmode="numeric" placeholder="200000" value="200000"/>
-      <div class="goal-modal-btns">
-        <button class="goal-modal-cancel" onclick="closeGoalModal()">Cancel</button>
-        <button class="goal-modal-save" onclick="saveGoal()">Save Goal</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ADD TRADE BUTTON -->
   <button class="add-btn-float" onclick="openModal()">+</button>
 
@@ -1695,6 +1683,17 @@ service cloud.firestore {
       </div>
     </div>
     <button onclick="closeInstallOverlay()" style="width:100%;margin-top:20px;padding:13px;background:linear-gradient(135deg,var(--green),var(--cyan));border:none;border-radius:12px;color:#070910;font-family:var(--font-display);font-size:15px;font-weight:800;cursor:pointer">Got it!</button>
+  </div>
+</div>
+<!-- GOAL EDIT MODAL — at body level so nothing clips it -->
+<div class="goal-modal-overlay" id="goal-modal-overlay" onclick="if(event.target===this)closeGoalModal()">
+  <div class="goal-modal-sheet">
+    <div class="goal-modal-title">🎯 Set Annual Goal</div>
+    <input class="goal-modal-input" id="goal-modal-input" type="number" inputmode="numeric" placeholder="200000" value="200000"/>
+    <div class="goal-modal-btns">
+      <button class="goal-modal-cancel" onclick="closeGoalModal()">Cancel</button>
+      <button class="goal-modal-save" onclick="saveGoal()">Save Goal</button>
+    </div>
   </div>
 </div>
 </body>

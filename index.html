@@ -626,7 +626,7 @@ function renderCalendar() {
 
   // Build day→net map from trades this month
   const dayNet = {};
-  trades.forEach(t => {
+  allTrades.forEach(t => {
     const d = new Date(t.date + "T12:00:00");
     if (d.getFullYear() === year && d.getMonth() === month) {
       const day = d.getDate();

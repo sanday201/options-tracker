@@ -811,7 +811,15 @@ function renderCharts() {
     lineChart = new Chart(lineCtx, {
       type: "line",
       data: {
-        labels: s.cumData.map((d,i) => i % Math.max(1,Math.floor(s.cumData.length/6))===0 ? d.date?.slice(5) : ""),
+        labels: s.cumData.map((d,i) => {
+          if (!d.date) return "";
+          const dt = new Date(d.date + "T12:00:00");
+          // Show label on Mondays (day 1) only
+          if (dt.getDay() === 1) return (dt.getMonth()+1).toString().padStart(2,"0") + "-" + dt.getDate().toString().padStart(2,"0");
+          // Also show first data point
+          if (i === 0) return d.date.slice(5);
+          return "";
+        }),
         datasets: [{ data: s.cumData.map(d => d.val), borderColor:"#00f5a0", borderWidth:2.5, fill:true, backgroundColor:grad, pointRadius:0, tension:0.4 }]
       },
       options: {
@@ -890,7 +898,16 @@ function renderCharts() {
     window._dailyChart = new Chart(dailyCtx, {
       type: "bar",
       data: {
-        labels: s.dailyPnL.map(d => d.date),
+        labels: s.dailyPnL.map((d,i) => {
+          if (!d.date) return "";
+          // d.date is already "MM-DD" format
+          const [mo, dy] = d.date.split("-").map(Number);
+          const yr = new Date().getFullYear();
+          const dt = new Date(yr, mo-1, dy);
+          // Show label on Mondays only (or first bar)
+          if (dt.getDay() === 1 || i === 0) return d.date;
+          return "";
+        }),
         datasets: [{ data: s.dailyPnL.map(d => d.val), backgroundColor: colors, borderRadius: 3, borderSkipped: false }]
       },
       options: {
@@ -911,7 +928,7 @@ function renderCharts() {
           }
         }},
         scales: {
-          x: { ticks:{ color:"#555", font:{family:"JetBrains Mono",size:8}, maxRotation:45, maxTicksLimit:12 }, grid:{display:false}, border:{display:false} },
+          x: { ticks:{ color:"#555", font:{family:"JetBrains Mono",size:8}, maxRotation:0, autoSkip:false, maxTicksLimit:100 }, grid:{display:false}, border:{display:false} },
           y: { ticks:{ color:"#555", font:{family:"JetBrains Mono",size:9}, callback: v=>"$"+v.toLocaleString() }, grid:{color:"#111"}, border:{display:false} }
         }
       }

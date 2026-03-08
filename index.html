@@ -1042,7 +1042,7 @@ function renderSparkline() {
     const tipX = i < 3 ? 0 : i > 4 ? -60 : -30; // shift tip left for right-side dots
     return `
       <g class="spark-dot-g" style="cursor:pointer">
-        <circle cx="${x}" cy="${y}" r="5" fill="transparent" stroke="none"/>
+        <circle cx="${x}" cy="${y}" r="10" fill="transparent" stroke="none"/>
         <circle cx="${x}" cy="${y}" r="2.5" fill="${col}" class="spark-dot" style="transition:r .15s"/>
         <g class="spark-tip" style="display:none;pointer-events:none">
           <rect x="${x+tipX-2}" y="${y-22}" width="64" height="16" rx="4" fill="#0d1422" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>
@@ -1062,16 +1062,32 @@ function renderSparkline() {
     </div>
   `;
 
-  // Bind hover/touch events
+  // Use pointerdown/pointerleave — works on both mouse AND touch on Android
+  let sparkTipTimer = null;
   el.querySelectorAll(".spark-dot-g").forEach(g => {
     const tip = g.querySelector(".spark-tip");
     const dot = g.querySelector(".spark-dot");
-    const show = () => { tip.style.display="block"; dot.setAttribute("r","4"); };
-    const hide = () => { tip.style.display="none"; dot.setAttribute("r","2.5"); };
-    g.addEventListener("mouseenter", show);
-    g.addEventListener("mouseleave", hide);
-    g.addEventListener("touchstart", e => { e.preventDefault(); show(); }, {passive:false});
-    g.addEventListener("touchend", () => setTimeout(hide, 1200));
+    const show = () => {
+      // Hide all other tips first
+      el.querySelectorAll(".spark-tip").forEach(t => t.style.display="none");
+      el.querySelectorAll(".spark-dot").forEach(d => d.setAttribute("r","2.5"));
+      tip.style.display = "block";
+      dot.setAttribute("r", "4");
+      if (sparkTipTimer) clearTimeout(sparkTipTimer);
+      sparkTipTimer = setTimeout(() => {
+        tip.style.display = "none";
+        dot.setAttribute("r", "2.5");
+      }, 2500);
+    };
+    g.addEventListener("pointerdown", e => { e.preventDefault(); show(); });
+    g.addEventListener("pointerenter", show);
+    g.addEventListener("pointerleave", () => {
+      if (sparkTipTimer) clearTimeout(sparkTipTimer);
+      sparkTipTimer = setTimeout(() => {
+        tip.style.display = "none";
+        dot.setAttribute("r", "2.5");
+      }, 400);
+    });
   });
 }
 

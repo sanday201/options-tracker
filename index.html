@@ -373,7 +373,6 @@ function renderAll() {
   renderBestDay();
   renderPersonalRecords();
   renderCharts();
-  renderHeatmap();
   renderMilestones();
   // Only rebuild log bar if not already built, always refresh items
   if (!document.getElementById("log-items-list")) { renderLog(); } else { renderLogItems(); }
@@ -1209,13 +1208,18 @@ function renderLog() {
 
 function setLogFilter(f) {
   logState.filter = f;
-  document.getElementById("lf-all")?.classList.toggle("active", f==="all");
-  document.getElementById("lf-wins")?.classList.toggle("active", f==="wins");
-  document.getElementById("lf-losses")?.classList.toggle("active-red", f==="losses");
-  document.getElementById("lf-wins")?.classList.toggle("active", f==="wins");
-  document.getElementById("lf-losses")?.classList.remove("active");
-  if (f==="all"||f==="wins") document.getElementById("lf-losses")?.classList.remove("active-red");
-  if (f==="all"||f==="losses") document.getElementById("lf-wins")?.classList.remove("active");
+  // Clear all first
+  const all = document.getElementById("lf-all");
+  const wins = document.getElementById("lf-wins");
+  const losses = document.getElementById("lf-losses");
+  if (!all || !wins || !losses) return;
+  all.className = "log-filter-btn";
+  wins.className = "log-filter-btn";
+  losses.className = "log-filter-btn";
+  // Set active on the right one
+  if (f === "all") all.className = "log-filter-btn active";
+  if (f === "wins") wins.className = "log-filter-btn active";
+  if (f === "losses") losses.className = "log-filter-btn active-red";
   renderLogItems();
 }
 
@@ -1269,7 +1273,6 @@ function setupUI() {
       btn.classList.add("active");
       document.getElementById("page-" + btn.dataset.page).classList.add("active");
       if (btn.dataset.page === "log") renderLog();
-      if (btn.dataset.page === "charts") renderHeatmap();
 
     });
   });
@@ -2071,7 +2074,6 @@ service cloud.firestore {
 
   <!-- ── CHARTS PAGE ── -->
   <div class="page" id="page-charts">
-    <div id="heatmap-section"></div>
     <div class="chart-card">
       <div class="chart-title">Cumulative Net Premium</div>
       <div class="chart-wrap"><canvas id="line-chart"></canvas></div>

@@ -665,6 +665,7 @@ function saveGoal() {
     goalTarget = val;
     localStorage.setItem("goalTarget", goalTarget);
     renderPaceAndGoal();
+    renderMilestones();
     closeGoalModal();
     showToast("✓ Goal updated!");
   }
@@ -814,10 +815,28 @@ function renderCharts() {
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => "$"+c.raw.toLocaleString("en-US",{minimumFractionDigits:2}) } } },
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            backgroundColor: "rgba(13,20,34,0.95)",
+            borderColor: "rgba(0,245,160,0.3)",
+            borderWidth: 1,
+            titleColor: "#888",
+            bodyColor: "#00f5a0",
+            padding: 10,
+            titleFont: { family: "JetBrains Mono", size: 9 },
+            bodyFont: { family: "JetBrains Mono", size: 12, weight: "700" },
+            callbacks: {
+              title: items => items[0].label || "",
+              label: c => " $" + c.raw.toLocaleString("en-US",{minimumFractionDigits:2})
+            }
+          }
+        },
         scales: {
-          x: { ticks: { color: "#666", font: {family:"Space Mono",size:9}, maxRotation:0 }, grid:{display:false}, border:{display:false} },
-          y: { ticks: { color: "#666", font: {family:"Space Mono",size:9}, callback: v => "$"+v.toLocaleString() }, grid:{color:"#111"}, border:{display:false} }
+          x: { ticks: { color: "#666", font: {family:"JetBrains Mono",size:9}, maxRotation:0 }, grid:{display:false}, border:{display:false} },
+          y: { ticks: { color: "#666", font: {family:"JetBrains Mono",size:9}, callback: v => "$"+v.toLocaleString() }, grid:{color:"#111"}, border:{display:false} }
         }
       }
     });
@@ -875,7 +894,21 @@ function renderCharts() {
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => (c.raw>=0?"+":"")+"$"+c.raw.toLocaleString("en-US",{minimumFractionDigits:2}) }}},
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend:{display:false}, tooltip:{
+          enabled: true,
+          backgroundColor: "rgba(13,20,34,0.95)",
+          borderColor: "rgba(255,255,255,0.1)",
+          borderWidth: 1,
+          titleColor: "#888",
+          padding: 10,
+          titleFont: { family: "JetBrains Mono", size: 9 },
+          bodyFont: { family: "JetBrains Mono", size: 12, weight: "700" },
+          callbacks: {
+            title: items => items[0].label || "",
+            label: c => { const v=c.raw; const col=v>=0?"#00f5a0":"#ff6b6b"; return " "+(v>=0?"+":"")+"$"+v.toLocaleString("en-US",{minimumFractionDigits:2}); }
+          }
+        }},
         scales: {
           x: { ticks:{ color:"#555", font:{family:"JetBrains Mono",size:8}, maxRotation:45, maxTicksLimit:12 }, grid:{display:false}, border:{display:false} },
           y: { ticks:{ color:"#555", font:{family:"JetBrains Mono",size:9}, callback: v=>"$"+v.toLocaleString() }, grid:{color:"#111"}, border:{display:false} }
@@ -1062,7 +1095,16 @@ function renderMilestones() {
   const s = computeStats();
   const el = document.getElementById("milestones-section");
   if (!el) return;
-  const milestones = [25000,50000,75000,100000,150000,200000];
+  // Generate milestones dynamically based on goalTarget
+  const goal = goalTarget || 200000;
+  const milestones = [];
+  // Always include standard steps up to goal
+  const steps = [25000, 50000, 75000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 500000, 600000, 750000, 1000000];
+  steps.forEach(s2 => { if (s2 <= goal) milestones.push(s2); });
+  // Always include the goal itself if not already in steps
+  if (!milestones.includes(goal)) milestones.push(goal);
+  // Sort
+  milestones.sort((a,b) => a-b);
   const fmt = n => "$" + n.toLocaleString("en-US");
   const fmtShort = n => "$" + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0});
 
@@ -1122,8 +1164,10 @@ function showMilestonePop(ms, curVal) {
 // ══════════════════════════════════════════
 // FEATURE: LOG SEARCH & FILTER
 // ══════════════════════════════════════════
-let logSearch = "";
-let logFilter = "all"; // all | wins | losses
+window.logSearch = "";
+window.logFilter = "all"; // all | wins | losses
+let logSearch = window.logSearch;
+let logFilter = window.logFilter;
 
 function renderLog() {
   const container = document.getElementById("log-list");
@@ -1132,7 +1176,7 @@ function renderLog() {
   // Build search bar HTML at top
   const searchBar = `
     <div class="log-search-bar">
-      <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." value="${logSearch}" oninput="logSearch=this.value;renderLogItems()" />
+      <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." value="${logSearch}" id="log-search-input" oninput="logSearch=this.value;window.logSearch=this.value;renderLogItems()" />
       <button class="log-filter-btn ${logFilter==='all'?'active':''}" onclick="setLogFilter('all')">All</button>
       <button class="log-filter-btn ${logFilter==='wins'?'active':''}" onclick="setLogFilter('wins')">Wins</button>
       <button class="log-filter-btn ${logFilter==='losses'?'active-red':''}" onclick="setLogFilter('losses')">Losses</button>
@@ -1145,7 +1189,15 @@ function renderLog() {
 
 function setLogFilter(f) {
   logFilter = f;
-  renderLog();
+  window.logFilter = f;
+  // Update button states manually
+  document.querySelectorAll(".log-filter-btn").forEach(b => {
+    b.classList.remove("active","active-red");
+    if (b.textContent.trim()==="All" && f==="all") b.classList.add("active");
+    if (b.textContent.trim()==="Wins" && f==="wins") b.classList.add("active");
+    if (b.textContent.trim()==="Losses" && f==="losses") b.classList.add("active-red");
+  });
+  renderLogItems();
 }
 
 function renderLogItems() {

@@ -436,7 +436,13 @@ window.addTrade = async () => {
 };
 
 window.deleteTrade = async (id) => {
-  if (!confirm("Delete this trade?")) return;
+  // Shake the row first, then delete
+  const row = document.querySelector(`.log-row[data-id="${id}"]`);
+  if (row) {
+    row.classList.add("shaking");
+    await new Promise(r => setTimeout(r, 380));
+  }
+  if (!confirm("Delete this trade?")) { if (row) row.classList.remove("shaking"); return; }
   try {
     await deleteDoc(doc(db, `users/${currentUser.uid}/trades/${id}`));
     showToast("Trade deleted");
@@ -825,6 +831,13 @@ function renderTickerTape() {
     `<div class="tape-item"><span class="tape-sym">${t.ticker}</span><span class="tape-val ${t.net>=0?'tape-pos':'tape-neg'}">${sign(t.net)}${fmt(t.net)}</span></div>`
   ).join("");
   el.innerHTML = inner + inner; // duplicate for seamless loop
+  // Speed up on green days, slow on red
+  const todayNet = (() => {
+    const today = new Date().toISOString().slice(0,10);
+    return allTrades.filter(t=>t.date===today).reduce((s,t)=>s+t.net,0);
+  })();
+  const speed = todayNet > 2000 ? 10 : todayNet > 500 ? 14 : todayNet < 0 ? 34 : 22;
+  el.style.animationDuration = speed + "s";
 }
 
 function renderKPIs() {
@@ -846,7 +859,15 @@ function renderKPIs() {
   setKPI("k-hour", "$"+s.avgHour.toFixed(2), "Per hour (÷24)");
   const winTrades = allTrades.filter(t => t.net > 0).length;
   setKPI("k-winrate", s.winRate+"%", winTrades+" of "+s.trades+" trades");
-  setKPI("k-streak", s.streak+" days", s.streak > 0 ? "🔥 Green streak" : "No active streak");
+  // Streak with fire animation
+  const streakEl = document.getElementById("k-streak");
+  if (streakEl) {
+    const fireEmoji = s.streak > 0 ? `<span class="streak-fire">🔥</span>` : "";
+    streakEl.querySelector(".kpi-val").innerHTML = s.streak + " days " + fireEmoji;
+    streakEl.querySelector(".kpi-sub").textContent = s.streak > 0 ? "Green streak" : "No active streak";
+    if (s.streak > 0) streakEl.classList.add("kpi-streak-active");
+    else streakEl.classList.remove("kpi-streak-active");
+  }
   const mtdSign = s.mtdChange >= 0 ? "+" : "";
   const mtdBadge = `<span style="display:inline-block;padding:1px 7px;border-radius:20px;font-size:9px;font-weight:700;background:${s.mtdChange>=0?'rgba(0,245,160,0.15)':'rgba(255,107,107,0.15)'};color:${s.mtdChange>=0?'var(--green)':'var(--red)'};margin-left:4px">${mtdSign}${s.mtdChange.toFixed(1)}%</span>`;
   const mtdEl = document.getElementById("k-mtd");
@@ -1323,6 +1344,39 @@ function showMilestonePop(ms, curVal) {
 // log state — single source of truth
 const logState = { search: "", filter: "all" };
 
+
+function tickUpKPIs() {
+  const s = computeStats();
+  const dur = 800;
+  // Animate each numeric KPI card value
+  const animate = (id, val, prefix="$", decimals=2) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const valEl = el.querySelector(".kpi-val");
+    if (!valEl) return;
+    let start = null;
+    const step = ts => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      const cur = val * ease;
+      valEl.textContent = prefix + Math.abs(cur).toLocaleString("en-US",{minimumFractionDigits:decimals,maximumFractionDigits:decimals});
+      if (p < 1) requestAnimationFrame(step);
+      else valEl.textContent = prefix + Math.abs(val).toLocaleString("en-US",{minimumFractionDigits:decimals,maximumFractionDigits:decimals});
+    };
+    requestAnimationFrame(step);
+  };
+  animate("k-ytd", s.ytdNet);
+  animate("k-mtd", s.mtd);
+  animate("k-max", s.maxTrade);
+  animate("k-worst", s.minTrade);
+  animate("k-avg", s.avgTrade);
+  animate("k-day", s.avgDay);
+  animate("k-hour", s.avgHour);
+  animate("k-trades", s.trades, "", 0);
+  animate("k-winrate", s.winRate, "", 0);
+}
+
 function buildLogBar() {
   const container = document.getElementById("log-list");
   if (!container) return;
@@ -1441,6 +1495,7 @@ function setupUI() {
           setTimeout(() => newPageEl.classList.remove("slide-in-right","slide-in-left"), 300);
         }
         if (newPage === "log") renderLog();
+        if (newPage === "dash") tickUpKPIs();
         currentPageIdx = newIdx;
       }, oldPageEl && newPage !== pageOrder[currentPageIdx] ? 80 : 0);
     });
@@ -1654,7 +1709,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .ticker-tape::before,.ticker-tape::after{content:'';position:absolute;top:0;bottom:0;width:32px;z-index:2}
 .ticker-tape::before{left:0;background:linear-gradient(90deg,#070910,transparent)}
 .ticker-tape::after{right:0;background:linear-gradient(-90deg,#070910,transparent)}
-.ticker-inner{display:flex;width:max-content;animation:tape-scroll 22s linear infinite}
+.ticker-inner{display:flex;width:max-content;animation:tape-scroll 22s linear infinite;transition:animation-duration 1s}
+
+@keyframes row-shake{0%{transform:translateX(0)}15%{transform:translateX(-8px)}30%{transform:translateX(7px)}45%{transform:translateX(-6px)}60%{transform:translateX(5px)}75%{transform:translateX(-3px)}100%{transform:translateX(0)}}
+.log-row.shaking{animation:row-shake 0.35s ease-out}
+
 @keyframes tape-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .tape-item{display:inline-flex;align-items:center;gap:5px;padding:0 16px;border-right:1px solid rgba(255,255,255,0.05);white-space:nowrap}
 
@@ -1830,6 +1889,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .user-row{display:flex;align-items:center;gap:8px}
 #user-photo{width:28px;height:28px;border-radius:50%;border:2px solid var(--green);object-fit:cover}
 #user-name{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+
+/* ── STREAK FIRE BOUNCE ── */
+@keyframes fire-bounce{0%,100%{transform:scale(1) rotate(-3deg)}25%{transform:scale(1.3) rotate(3deg)}50%{transform:scale(1.1) rotate(-2deg)}75%{transform:scale(1.25) rotate(2deg)}}
+.streak-fire{display:inline-block;animation:fire-bounce 0.7s ease-in-out infinite}
+@keyframes streak-glow{0%,100%{box-shadow:0 0 0 0 rgba(255,190,11,0)}50%{box-shadow:0 0 18px 4px rgba(255,190,11,0.25)}}
+.kpi-streak-active{animation:streak-glow 2s ease-in-out infinite;border-color:rgba(255,190,11,0.3) !important}
 
 /* ── EXPORT ── */
 .export-btn{background:rgba(0,245,160,0.08);border:1px solid rgba(0,245,160,0.2);border-radius:8px;padding:4px 10px;color:var(--green);font-family:var(--font-mono);font-size:10px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}

@@ -928,7 +928,10 @@ function renderCharts() {
             titleFont: { family: "JetBrains Mono", size: 9 },
             bodyFont: { family: "JetBrains Mono", size: 12, weight: "700" },
             callbacks: {
-              title: items => items[0].label || "",
+              title: items => {
+                const d = s.cumData[items[0].dataIndex];
+                return d?.date ? d.date.slice(5).replace("-","/") : "";
+              },
               label: c => " $" + c.raw.toLocaleString("en-US",{minimumFractionDigits:2})
             }
           }

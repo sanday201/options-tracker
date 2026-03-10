@@ -382,6 +382,20 @@ function exportCSV() {
   showToast(`✓ Exported ${sorted.length} trades`);
 }
 
+
+function morphAddBtn() {
+  const btn = document.getElementById("add-btn-float");
+  const inner = document.getElementById("add-btn-inner");
+  if (!btn || !inner) return;
+  inner.textContent = "✓";
+  btn.classList.add("btn-success");
+  if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
+  setTimeout(() => {
+    btn.classList.remove("btn-success");
+    inner.textContent = "+";
+  }, 1400);
+}
+
 window.signInGoogle = async () => {
   const provider = new GoogleAuthProvider();
   try { await signInWithPopup(auth, provider); }
@@ -413,6 +427,7 @@ window.addTrade = async () => {
     });
     closeModal();
     showToast("✓ Trade added!");
+    morphAddBtn();
     if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
     document.getElementById("f-gross").value = "";
     document.getElementById("f-fees").value = "";
@@ -840,6 +855,12 @@ function renderKPIs() {
     mtdEl.querySelector(".kpi-sub").innerHTML = "vs last month " + mtdBadge;
   }
   updateDailyBanner();
+  // Staggered reveal
+  const kpis = document.querySelectorAll(".kpi");
+  kpis.forEach(k => k.classList.add("kpi-hidden"));
+  kpis.forEach((k, i) => {
+    setTimeout(() => k.classList.add("kpi-visible"), 60 + i * 70);
+  });
 }
 
 function setKPI(id, val, sub) {
@@ -1388,14 +1409,37 @@ function setupUI() {
   // Export button
   document.getElementById("export-btn")?.addEventListener("click", exportCSV);
   // Nav
+  const pageOrder = ["dash","tickers","charts","log"];
+  let currentPageIdx = 0;
   document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-      document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById("page-" + btn.dataset.page).classList.add("active");
-      if (btn.dataset.page === "log") renderLog();
+      const newPage = btn.dataset.page;
+      const newIdx = pageOrder.indexOf(newPage);
+      const goingRight = newIdx > currentPageIdx;
+      const oldPageEl = document.querySelector(".page.active");
 
+      if (oldPageEl && newPage !== pageOrder[currentPageIdx]) {
+        // Slide out current
+        oldPageEl.classList.add(goingRight ? "slide-out-left" : "slide-out-right");
+        setTimeout(() => {
+          oldPageEl.classList.remove("active","slide-out-left","slide-out-right");
+        }, 220);
+      }
+
+      // Update nav
+      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      // Slide in new page after short delay
+      setTimeout(() => {
+        const newPageEl = document.getElementById("page-" + newPage);
+        if (newPageEl) {
+          newPageEl.classList.add("active", goingRight ? "slide-in-right" : "slide-in-left");
+          setTimeout(() => newPageEl.classList.remove("slide-in-right","slide-in-left"), 300);
+        }
+        if (newPage === "log") renderLog();
+        currentPageIdx = newIdx;
+      }, oldPageEl && newPage !== pageOrder[currentPageIdx] ? 80 : 0);
     });
   });
 
@@ -1798,13 +1842,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .header-sub{font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-top:4px}
 
 /* PAGES */
-.page{display:none;padding:14px;animation:fadeIn .25s ease}
+
+/* ── PAGE SLIDE TRANSITIONS ── */
+.page{display:none;padding:14px}
 .page.active{display:block}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.page.slide-in-right{animation:slideInRight .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
+.page.slide-in-left{animation:slideInLeft .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
+.page.slide-out-right{animation:slideOutRight .22s cubic-bezier(0.55,0,1,0.45) forwards}
+.page.slide-out-left{animation:slideOutLeft .22s cubic-bezier(0.55,0,1,0.45) forwards}
+@keyframes slideInRight{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideInLeft{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideOutRight{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}
+@keyframes slideOutLeft{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(-40px)}}
+
 
 /* KPI */
 .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.kpi{background:linear-gradient(135deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.01) 100%);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:14px 15px;position:relative;overflow:hidden;backdrop-filter:blur(10px);box-shadow:0 4px 24px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.06);transition:box-shadow .2s,transform .15s}
+
+/* ── STAGGERED KPI REVEAL ── */
+.kpi{background:linear-gradient(135deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.01) 100%);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:14px 15px;position:relative;overflow:hidden;backdrop-filter:blur(10px);box-shadow:0 4px 24px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.06);transition:box-shadow .2s,transform .15s,opacity .4s,translate .5s}
+.kpi.kpi-hidden{opacity:0;translate:0 24px}
+.kpi.kpi-visible{opacity:1;translate:0 0}
+@keyframes kpi-in{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+
 .kpi-glow{position:absolute;top:0;right:0;width:60px;height:60px;border-radius:50%}
 .kpi-label{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:4px}
 .kpi-val{font-family:var(--font-display);font-size:19px;font-weight:800;line-height:1.1}
@@ -1838,8 +1898,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .swipe-hint{position:absolute;right:0;top:0;bottom:0;width:70px;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0;transition:opacity .2s;border-radius:0 10px 10px 0;pointer-events:none}
 
 /* MODAL */
-.add-btn-float{position:fixed;bottom:22px;right:18px;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--cyan));border:none;cursor:pointer;font-size:28px;box-shadow:0 4px 24px rgba(0,245,160,0.45);z-index:200;display:flex;align-items:center;justify-content:center;transition:transform .15s;color:#070910;font-weight:800}
+
+/* ── ADD BTN MORPH ── */
+.add-btn-float{position:fixed;bottom:22px;right:18px;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--cyan));border:none;cursor:pointer;font-size:28px;box-shadow:0 4px 24px rgba(0,245,160,0.45);z-index:200;display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .3s;color:#070910;font-weight:800}
 .add-btn-float:active{transform:scale(0.9)}
+.add-btn-float.btn-success{background:linear-gradient(135deg,#00f5a0,#00f5a0);box-shadow:0 4px 32px rgba(0,245,160,0.8);transform:scale(1.12)}
+.add-btn-float .btn-inner{transition:transform .25s cubic-bezier(0.34,1.56,0.64,1),opacity .2s;display:flex;align-items:center;justify-content:center}
+.add-btn-float.btn-success .btn-inner{transform:scale(1.15)}
+@keyframes ripple-out{0%{box-shadow:0 0 0 0 rgba(0,245,160,0.5)}100%{box-shadow:0 0 0 22px rgba(0,245,160,0)}}
+.add-btn-float.btn-success{animation:ripple-out .6s ease-out}
+
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:300;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px)}
 .modal-overlay.open{display:flex;animation:slideUp .3s cubic-bezier(.34,1.56,.64,1)}
 @keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
@@ -2223,7 +2291,7 @@ service cloud.firestore {
 
 
   <!-- ADD TRADE BUTTON -->
-  <button class="add-btn-float" onclick="openModal()">+</button>
+  <button class="add-btn-float" id="add-btn-float" onclick="openModal()"><span class="btn-inner" id="add-btn-inner">+</span></button>
 
   <!-- ADD TRADE MODAL -->
   <div class="modal-overlay" id="trade-modal" onclick="if(event.target===this)closeModal()">

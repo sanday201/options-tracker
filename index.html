@@ -1436,10 +1436,12 @@ function renderLogItems() {
     container.innerHTML = `<div class="log-empty">No trades match your filter.</div>`;
     return;
   }
-  // compute running totals for full sorted list
+  // compute running totals — must sort by date first for correct cumulative
   let running = 0;
   const runMap = {};
-  [...allTrades].forEach(t => { running += t.net; runMap[t.id] = running; });
+  [...allTrades]
+    .sort((a,b) => a.date.localeCompare(b.date))
+    .forEach(t => { running += t.net; runMap[t.id] = running; });
   container.innerHTML = filtered.map(t => {
     const net = t.net;
     const col = net>=0?"var(--green)":"var(--red)";

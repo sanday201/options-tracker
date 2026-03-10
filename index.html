@@ -317,6 +317,71 @@ function listenToTrades(uid) {
 }
 
 // ── AUTH ACTIONS ───────────────────────────────────────────────
+
+// ══════════════════════════════════════════
+// EXPORT TO CSV
+// ══════════════════════════════════════════
+function exportCSV() {
+  if (!allTrades || allTrades.length === 0) {
+    showToast("No trades to export", true);
+    return;
+  }
+
+  // Sort trades by date ascending
+  const sorted = [...allTrades].sort((a, b) => a.date.localeCompare(b.date));
+
+  // Running total column
+  let running = 0;
+  const rows = sorted.map(t => {
+    running += t.net;
+    return {
+      date: t.date,
+      ticker: t.ticker,
+      gross: (t.gross || 0).toFixed(2),
+      fees: (t.fees || 0).toFixed(2),
+      net: t.net.toFixed(2),
+      cumulative: running.toFixed(2)
+    };
+  });
+
+  // Build CSV string
+  const headers = ["Date", "Ticker", "Gross Premium", "Fees", "Net Premium", "Cumulative Net"];
+  const lines = [
+    headers.join(","),
+    ...rows.map(r => [r.date, r.ticker, r.gross, r.fees, r.net, r.cumulative].join(","))
+  ];
+
+  // Add summary rows at bottom
+  const s = computeStats();
+  lines.push(""); // blank line
+  lines.push("SUMMARY,,,,, ");
+  lines.push(`YTD Net,,,,,${s.ytdNet.toFixed(2)}`);
+  lines.push(`YTD Gross,,,,,${s.ytdGross.toFixed(2)}`);
+  lines.push(`YTD Fees,,,,,${s.ytdFees.toFixed(2)}`);
+  lines.push(`Total Trades,,,,,${s.trades}`);
+  lines.push(`Win Rate,,,,,${s.winRate}%`);
+  lines.push(`Avg Per Trade,,,,,${s.avgTrade.toFixed(2)}`);
+  lines.push(`Avg Per Day,,,,,${s.avgDay.toFixed(2)}`);
+  lines.push(`Best Trade,,,,,${s.maxTrade.toFixed(2)}`);
+  lines.push(`Worst Trade,,,,,${s.minTrade.toFixed(2)}`);
+
+  const csv = lines.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  // Trigger download
+  const a = document.createElement("a");
+  a.href = url;
+  const today = new Date().toISOString().slice(0, 10);
+  a.download = `options-tracker-${today}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast(`✓ Exported ${sorted.length} trades`);
+}
+
 window.signInGoogle = async () => {
   const provider = new GoogleAuthProvider();
   try { await signInWithPopup(auth, provider); }
@@ -1320,6 +1385,8 @@ function renderLogItems() {
 
 // ── UI HELPERS ─────────────────────────────────────────────────
 function setupUI() {
+  // Export button
+  document.getElementById("export-btn")?.addEventListener("click", exportCSV);
   // Nav
   document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1716,6 +1783,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .user-row{display:flex;align-items:center;gap:8px}
 #user-photo{width:28px;height:28px;border-radius:50%;border:2px solid var(--green);object-fit:cover}
 #user-name{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+/* ── EXPORT ── */
+.export-btn{background:rgba(0,245,160,0.08);border:1px solid rgba(0,245,160,0.2);border-radius:8px;padding:4px 10px;color:var(--green);font-family:var(--font-mono);font-size:10px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
+.export-btn:active{background:rgba(0,245,160,0.18);transform:scale(0.97)}
+
 .signout-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;color:var(--dim);font-family:var(--font-mono);font-size:10px;cursor:pointer;transition:color .15s}
 .signout-btn:active{color:var(--red)}
 .header-title{font-family:var(--font-display);font-size:24px;font-weight:800;line-height:1.1;margin-top:0}
@@ -1934,6 +2006,7 @@ service cloud.firestore {
       <div class="user-row" style="flex-shrink:0;margin-top:2px">
         <img id="user-photo" src="" alt="" style="display:none"/>
         <span id="user-name"></span>
+        <button class="export-btn" id="export-btn">⬇ CSV</button>
         <button class="signout-btn" onclick="signOutUser()">Sign out</button>
       </div>
     </div>

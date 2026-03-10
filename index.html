@@ -884,7 +884,7 @@ function renderCharts() {
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => "$"+c.raw.toLocaleString("en-US",{minimumFractionDigits:2}) } } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { title: items => items[0]?.label || "", label: c => " $"+c.raw.toLocaleString("en-US",{minimumFractionDigits:2}) } } },
         scales: {
           x: { ticks: { color: "#666", font: {family:"Space Mono",size:10} }, grid: { display: false }, border:{display:false} },
           y: { ticks: { color: "#666", font: {family:"Space Mono",size:10}, callback: v => "$"+v.toLocaleString() }, grid: { color: "#111" }, border:{display:false} }

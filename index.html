@@ -607,7 +607,8 @@ function renderPaceAndGoal() {
 
   const setPace = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   setPace("pace-title", monthNames[month] + " Pace");
-  setPace("pace-dayinfo", "Day " + dayOfMonth + " of " + daysInMonth);
+  const dailyTarget = Math.round((goalTarget / 365) / 50) * 50;
+  setPace("pace-dayinfo", "Day " + dayOfMonth + " of " + daysInMonth + " · $" + dailyTarget.toLocaleString() + "/day target");
   setPace("pace-cur", fmt(s.mtd));
   setPace("pace-proj", fmt(projected));
   setPace("pace-done-lbl", dayOfMonth + " days done");
@@ -1415,7 +1416,8 @@ window.dismissBanner = (id) => {
 
 function updateDailyBanner() {
   const today = new Date().toISOString().slice(0,10);
-  const DAILY_GOAL = 1000;
+  // Daily goal = annual goal / 365, rounded to nearest $50
+  const DAILY_GOAL = Math.round((goalTarget / 365) / 50) * 50;
 
   const bannerEl = document.getElementById("banner-daily");
   const textEl = document.getElementById("banner-daily-text");
@@ -1440,7 +1442,7 @@ function updateDailyBanner() {
 
   // Goal banner — only for today
   if (isToday && net >= DAILY_GOAL && !localStorage.getItem("goal-dismissed-"+today)) {
-    goalText.textContent = `🎯 Daily goal reached! ${sign}$${net.toLocaleString("en-US",{minimumFractionDigits:2})} today`;
+    goalText.textContent = `🎯 Daily goal hit! ${sign}$${net.toLocaleString("en-US",{minimumFractionDigits:2})} (target $${DAILY_GOAL.toLocaleString()}/day)`;
     goalEl.classList.add("show");
   }
 }

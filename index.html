@@ -1037,8 +1037,8 @@ function renderCharts() {
           titleFont: { family: "JetBrains Mono", size: 9 },
           bodyFont: { family: "JetBrains Mono", size: 12, weight: "700" },
           callbacks: {
-            title: items => items[0].label || "",
-            label: c => { const v=c.raw; const col=v>=0?"#00f5a0":"#ff6b6b"; return " "+(v>=0?"+":"")+"$"+v.toLocaleString("en-US",{minimumFractionDigits:2}); }
+            title: items => s.dailyPnL[items[0].dataIndex]?.date || items[0].label || "",
+            label: c => { const v=c.raw; return " "+(v>=0?"+":"")+"$"+v.toLocaleString("en-US",{minimumFractionDigits:2}); }
           }
         }},
         scales: {

@@ -372,8 +372,7 @@ function exportCSV() {
   // Trigger download
   const a = document.createElement("a");
   a.href = url;
-  const today = new Date().toISOString().slice(0, 10);
-  a.download = `options-tracker-${today}.csv`;
+  a.download = `options-tracker-${localDateStr()}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -394,6 +393,15 @@ function morphAddBtn() {
     btn.classList.remove("btn-success");
     inner.textContent = "+";
   }, 1400);
+}
+
+
+// Always use LOCAL date (not UTC) to avoid timezone-off-by-one-day bugs
+function localDateStr(d) {
+  const dt = d || new Date();
+  return dt.getFullYear() + "-" +
+    String(dt.getMonth()+1).padStart(2,"0") + "-" +
+    String(dt.getDate()).padStart(2,"0");
 }
 
 window.signInGoogle = async () => {
@@ -833,8 +841,7 @@ function renderTickerTape() {
   el.innerHTML = inner + inner; // duplicate for seamless loop
   // Speed up on green days, slow on red
   const todayNet = (() => {
-    const today = new Date().toISOString().slice(0,10);
-    return allTrades.filter(t=>t.date===today).reduce((s,t)=>s+t.net,0);
+    return allTrades.filter(t=>t.date===localDateStr()).reduce((s,t)=>s+t.net,0);
   })();
   const speed = todayNet > 2000 ? 10 : todayNet > 500 ? 14 : todayNet < 0 ? 34 : 22;
   el.style.animationDuration = speed + "s";
@@ -1513,9 +1520,8 @@ function setupUI() {
   });
 
   // Date default to today
-  const today = new Date().toISOString().slice(0,10);
   const dateInput = document.getElementById("f-date");
-  if (dateInput) dateInput.value = today;
+  if (dateInput) dateInput.value = localDateStr();
 
   // Fees auto calc
   document.getElementById("f-gross")?.addEventListener("input", e => {
@@ -1586,7 +1592,7 @@ window.dismissBanner = (id) => {
 };
 
 function updateDailyBanner() {
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDateStr();
   // Daily goal = annual goal / 365, rounded to nearest $50
   const DAILY_GOAL = Math.round((goalTarget / 365) / 50) * 50;
 
@@ -1595,24 +1601,24 @@ function updateDailyBanner() {
   const goalEl = document.getElementById("banner-goal");
   const goalText = document.getElementById("banner-goal-text");
 
-  // Group by day
+  // Always show TODAY — if no trades today, show $0
   const dayMap = {};
   allTrades.forEach(t => { if (!t.date) return; if (!dayMap[t.date]) dayMap[t.date] = []; dayMap[t.date].push(t); });
-  const sortedDates = Object.keys(dayMap).sort();
-  const latestDate = sortedDates[sortedDates.length - 1];
-  if (!latestDate) return;
 
-  const isToday = latestDate === today;
-  const trades = dayMap[latestDate];
-  const net = trades.reduce((s,t) => s + t.net, 0);
+  const todayTrades = dayMap[today] || [];
+  const net = todayTrades.reduce((s,t) => s + t.net, 0);
   const sign = net >= 0 ? "+" : "";
-  const label = isToday ? "Today" : latestDate.slice(5).replace("-","/");
 
-  textEl.textContent = `${label}: ${sign}$${net.toLocaleString("en-US",{minimumFractionDigits:2})} · ${trades.length} trade${trades.length>1?"s":""}`;
-  bannerEl.className = "banner banner-daily show" + (net < 0 ? " red" : "");
+  if (todayTrades.length === 0) {
+    textEl.textContent = `Today: No trades yet`;
+    bannerEl.className = "banner banner-daily show";
+  } else {
+    textEl.textContent = `Today: ${sign}$${net.toLocaleString("en-US",{minimumFractionDigits:2})} · ${todayTrades.length} trade${todayTrades.length>1?"s":""}`;
+    bannerEl.className = "banner banner-daily show" + (net < 0 ? " red" : "");
+  }
 
   // Goal banner — only for today
-  if (isToday && net >= DAILY_GOAL && !localStorage.getItem("goal-dismissed-"+today)) {
+  if (todayTrades.length > 0 && net >= DAILY_GOAL && !localStorage.getItem("goal-dismissed-"+today)) {
     goalText.textContent = `🎯 Daily goal hit! ${sign}$${net.toLocaleString("en-US",{minimumFractionDigits:2})} (target $${DAILY_GOAL.toLocaleString()}/day)`;
     goalEl.classList.add("show");
   }

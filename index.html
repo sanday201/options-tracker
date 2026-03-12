@@ -1462,7 +1462,7 @@ function renderLogItems() {
     return `<div class="log-row" data-id="${t.id}">
       <div>
         <div class="log-ticker">${t.ticker}</div>
-        <div class="log-date">${t.date}</div>
+        <div class="log-date">${t.date}${t.createdAt?.seconds ? ' · ' + new Date(t.createdAt.seconds * 1000).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true, timeZone:'America/Chicago'}) : ''}</div>
       </div>
       <div style="font-family:var(--font-mono);font-size:10px;color:#444;text-align:center;align-self:center">
         ∑ $${(runMap[t.id]||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}

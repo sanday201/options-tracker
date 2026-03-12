@@ -1431,7 +1431,14 @@ function setLogFilter(f) {
 function renderLogItems() {
   const container = document.getElementById("log-items-list");
   if (!container) return;
-  const sorted = [...allTrades].reverse();
+  // Sort by date DESC, then by createdAt DESC for same-day trades
+  const sorted = [...allTrades].sort((a, b) => {
+    if (b.date !== a.date) return b.date.localeCompare(a.date);
+    // Same date: sort by entry order (createdAt) newest first
+    const aT = a.createdAt?.seconds || 0;
+    const bT = b.createdAt?.seconds || 0;
+    return bT - aT;
+  });
   const q = (logState.search||"").toLowerCase().trim();
   const f = logState.filter || "all";
   const filtered = sorted.filter(t => {

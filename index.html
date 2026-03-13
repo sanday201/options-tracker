@@ -1624,10 +1624,15 @@ function updateDailyBanner() {
     bannerEl.className = "banner banner-daily show" + (net < 0 ? " red" : "");
   }
 
-  // Goal banner — only for today
+  // Goal banner — always keep in sync with current net
   if (todayTrades.length > 0 && net >= DAILY_GOAL && !localStorage.getItem("goal-dismissed-"+today)) {
+    // Always update the amount live so it stays in sync with Today banner
     goalText.textContent = `🎯 Daily goal hit! ${sign}$${net.toLocaleString("en-US",{minimumFractionDigits:2})} (target $${DAILY_GOAL.toLocaleString()}/day)`;
     goalEl.classList.add("show");
+  } else if (net < DAILY_GOAL) {
+    // Net dropped below goal (e.g. added a loss) — hide banner and reset dismiss key
+    goalEl.classList.remove("show");
+    localStorage.removeItem("goal-dismissed-"+today);
   }
 }
 

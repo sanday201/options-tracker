@@ -41,7 +41,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp }
+import { getFirestore, collection, addDoc, getDocs, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ⬇️ PASTE YOUR FIREBASE CONFIG HERE
@@ -454,6 +454,52 @@ window.deleteTrade = async (id) => {
   try {
     await deleteDoc(doc(db, `users/${currentUser.uid}/trades/${id}`));
     showToast("Trade deleted");
+  } catch(e) { showToast("Error: " + e.message, true); }
+};
+
+// ── EDIT TRADE ──────────────────────────────────────────────
+let editingTradeId = null;
+
+window.openEditModal = (id) => {
+  const trade = allTrades.find(t => t.id === id);
+  if (!trade) return;
+  editingTradeId = id;
+  document.getElementById("f-date").value = trade.date || "";
+  document.getElementById("f-ticker").value = trade.ticker || "";
+  document.getElementById("f-fees").value = (!trade.fees || trade.fees === 0) ? "" : trade.fees;
+  const gross = (trade.gross !== undefined) ? trade.gross : trade.net;
+  document.getElementById("f-gross").value = Math.abs(gross);
+  const signBtn = document.getElementById("sign-toggle");
+  if (gross < 0) {
+    signBtn.textContent = "−"; signBtn.style.color = "var(--red)";
+    signBtn.style.borderColor = "rgba(255,107,107,0.4)"; signBtn.style.background = "rgba(255,107,107,0.1)";
+  } else {
+    signBtn.textContent = "+"; signBtn.style.color = "var(--green)";
+    signBtn.style.borderColor = "rgba(255,255,255,0.12)"; signBtn.style.background = "rgba(255,255,255,0.05)";
+  }
+  document.querySelectorAll(".chip").forEach(c => c.classList.toggle("selected", c.dataset.ticker === trade.ticker));
+  const ml1 = document.getElementById("modal-mode-label"); if(ml1) ml1.textContent = "✏️ Edit Trade";
+  document.querySelector(".submit-btn").textContent = "Save Changes";
+  document.querySelector(".submit-btn").onclick = () => saveEditTrade();
+  document.getElementById("trade-modal").classList.add("open");
+};
+
+window.saveEditTrade = async () => {
+  if (!editingTradeId) return;
+  const date = document.getElementById("f-date").value;
+  const ticker = document.getElementById("f-ticker").value.trim().toUpperCase();
+  const btn = document.getElementById("sign-toggle");
+  const isNeg = btn && btn.textContent.trim() === "−";
+  const rawGross = Math.abs(parseFloat(document.getElementById("f-gross").value));
+  const gross = isNeg ? -rawGross : rawGross;
+  const fees = parseFloat(document.getElementById("f-fees").value) || 0;
+  if (!date || !ticker || isNaN(gross)) { showToast("Fill in Date, Ticker & Premium", true); return; }
+  const net = parseFloat((gross - fees).toFixed(2));
+  try {
+    await updateDoc(doc(db, `users/${currentUser.uid}/trades/${editingTradeId}`), { date, ticker, gross, fees, net });
+    closeModal();
+    showToast("✓ Trade updated!");
+    editingTradeId = null;
   } catch(e) { showToast("Error: " + e.message, true); }
 };
 
@@ -1349,7 +1395,7 @@ function showMilestonePop(ms, curVal) {
 // FEATURE: LOG SEARCH & FILTER
 // ══════════════════════════════════════════
 // log state — single source of truth
-const logState = { search: "", filter: "all" };
+const logState = { search: "", filter: "all", dateRange: "all", customFrom: "", customTo: "" };
 
 
 function tickUpKPIs() {
@@ -1389,11 +1435,25 @@ function buildLogBar() {
   if (!container) return;
   container.innerHTML = `
     <div class="log-search-bar">
-      <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." />
+      <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." value="${logState.search}"/>
       <button class="log-filter-btn" id="lf-all">All</button>
       <button class="log-filter-btn" id="lf-wins">Wins</button>
       <button class="log-filter-btn" id="lf-losses">Losses</button>
     </div>
+    <div class="log-date-bar" id="log-date-bar">
+      <button class="log-date-btn" id="ldr-all">All Time</button>
+      <button class="log-date-btn" id="ldr-7">7D</button>
+      <button class="log-date-btn" id="ldr-30">30D</button>
+      <button class="log-date-btn" id="ldr-mtd">MTD</button>
+      <button class="log-date-btn" id="ldr-custom">Custom</button>
+    </div>
+    <div class="log-custom-range" id="log-custom-range" style="display:none">
+      <input class="log-range-input" id="ldr-from" type="date" placeholder="From"/>
+      <span style="color:var(--dim);font-size:11px">to</span>
+      <input class="log-range-input" id="ldr-to" type="date" placeholder="To"/>
+      <button class="log-range-go" id="ldr-go">Go</button>
+    </div>
+    <div class="log-count-note" id="log-count-note"></div>
     <div id="log-items-list"></div>`;
   document.getElementById("log-search-input").addEventListener("input", function() {
     logState.search = this.value;
@@ -1402,7 +1462,60 @@ function buildLogBar() {
   document.getElementById("lf-all").addEventListener("click", function() { setLogFilter("all"); });
   document.getElementById("lf-wins").addEventListener("click", function() { setLogFilter("wins"); });
   document.getElementById("lf-losses").addEventListener("click", function() { setLogFilter("losses"); });
-  setLogFilter(logState.filter); // apply current state to buttons
+
+  const dateRangeBtns = { all:"ldr-all", "7":"ldr-7", "30":"ldr-30", mtd:"ldr-mtd", custom:"ldr-custom" };
+  Object.entries(dateRangeBtns).forEach(([range, btnId]) => {
+    document.getElementById(btnId)?.addEventListener("click", () => setDateRange(range));
+  });
+  document.getElementById("ldr-go")?.addEventListener("click", () => {
+    logState.customFrom = document.getElementById("ldr-from")?.value || "";
+    logState.customTo = document.getElementById("ldr-to")?.value || "";
+    renderLogItems();
+    applyDateRangeButtons();
+  });
+  if (logState.customFrom) document.getElementById("ldr-from").value = logState.customFrom;
+  if (logState.customTo) document.getElementById("ldr-to").value = logState.customTo;
+  if (logState.dateRange === "custom") document.getElementById("log-custom-range").style.display = "flex";
+
+  setLogFilter(logState.filter);
+  applyDateRangeButtons();
+}
+
+function setDateRange(range) {
+  logState.dateRange = range;
+  const customRow = document.getElementById("log-custom-range");
+  if (customRow) customRow.style.display = range === "custom" ? "flex" : "none";
+  if (range !== "custom") renderLogItems();
+  applyDateRangeButtons();
+}
+
+function applyDateRangeButtons() {
+  const ids = { all:"ldr-all", "7":"ldr-7", "30":"ldr-30", mtd:"ldr-mtd", custom:"ldr-custom" };
+  Object.entries(ids).forEach(([range, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.className = "log-date-btn" + (logState.dateRange === range ? " active" : "");
+  });
+}
+
+function getDateRangeBounds() {
+  const now = new Date();
+  const today = localDateStr();
+  if (logState.dateRange === "all") return { from: null, to: null };
+  if (logState.dateRange === "7") {
+    const d = new Date(); d.setDate(d.getDate() - 6);
+    return { from: localDateStr(d), to: today };
+  }
+  if (logState.dateRange === "30") {
+    const d = new Date(); d.setDate(d.getDate() - 29);
+    return { from: localDateStr(d), to: today };
+  }
+  if (logState.dateRange === "mtd") {
+    return { from: now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0") + "-01", to: today };
+  }
+  if (logState.dateRange === "custom") {
+    return { from: logState.customFrom || null, to: logState.customTo || null };
+  }
+  return { from: null, to: null };
 }
 
 function renderLog() {
@@ -1413,69 +1526,64 @@ function renderLog() {
 
 function setLogFilter(f) {
   logState.filter = f;
-  // Clear all first
   const all = document.getElementById("lf-all");
   const wins = document.getElementById("lf-wins");
   const losses = document.getElementById("lf-losses");
-  if (!all || !wins || !losses) return;
-  all.className = "log-filter-btn";
-  wins.className = "log-filter-btn";
-  losses.className = "log-filter-btn";
-  // Set active on the right one
-  if (f === "all") all.className = "log-filter-btn active";
-  if (f === "wins") wins.className = "log-filter-btn active";
-  if (f === "losses") losses.className = "log-filter-btn active-red";
+  if (all) all.className = "log-filter-btn" + (f==="all"?" active":"");
+  if (wins) wins.className = "log-filter-btn" + (f==="wins"?" active":"");
+  if (losses) losses.className = "log-filter-btn" + (f==="losses"?" active-red":"");
   renderLogItems();
 }
 
 function renderLogItems() {
   const container = document.getElementById("log-items-list");
   if (!container) return;
-  // Sort by date DESC, then by createdAt DESC for same-day trades
   const sorted = [...allTrades].sort((a, b) => {
     if (b.date !== a.date) return b.date.localeCompare(a.date);
-    // Same date: sort by entry order (createdAt) newest first
     const aT = a.createdAt?.seconds || 0;
     const bT = b.createdAt?.seconds || 0;
     return bT - aT;
   });
   const q = (logState.search||"").toLowerCase().trim();
   const f = logState.filter || "all";
+  const { from, to } = getDateRangeBounds();
   const filtered = sorted.filter(t => {
     const matchQ = !q || (t.ticker||"").toLowerCase().includes(q);
     const matchF = f==="all" || (f==="wins" && t.net>0) || (f==="losses" && t.net<=0);
-    return matchQ && matchF;
+    const matchDate = (!from || t.date >= from) && (!to || t.date <= to);
+    return matchQ && matchF && matchDate;
   });
+  const noteEl = document.getElementById("log-count-note");
+  if (noteEl) noteEl.textContent = filtered.length < allTrades.length ? filtered.length + " of " + allTrades.length + " trades" : "";
   if (filtered.length===0) {
-    container.innerHTML = `<div class="log-empty">No trades match your filter.</div>`;
+    container.innerHTML = '<div class="log-empty">No trades match your filter.</div>';
     return;
   }
-  // compute running totals — must sort by date first for correct cumulative
   let running = 0;
   const runMap = {};
-  [...allTrades]
-    .sort((a,b) => a.date.localeCompare(b.date))
-    .forEach(t => { running += t.net; runMap[t.id] = running; });
+  [...allTrades].sort((a,b) => a.date.localeCompare(b.date)).forEach(t => { running += t.net; runMap[t.id] = running; });
   container.innerHTML = filtered.map(t => {
     const net = t.net;
     const col = net>=0?"var(--green)":"var(--red)";
-    return `<div class="log-row" data-id="${t.id}">
-      <div>
-        <div class="log-ticker">${t.ticker}</div>
-        <div class="log-date">${t.date}${t.createdAt?.seconds ? ' · ' + new Date(t.createdAt.seconds * 1000).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true, timeZone:'America/Chicago'}) : ''}</div>
-      </div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:#444;text-align:center;align-self:center">
-        ∑ $${(runMap[t.id]||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
-      </div>
-      <div style="text-align:right">
-        <div class="log-net" style="color:${col}">${net>=0?"+":""}$${Math.abs(net).toLocaleString("en-US",{minimumFractionDigits:2})}</div>
-        <div class="log-gross">Gross $${(t.gross||0).toLocaleString("en-US",{minimumFractionDigits:2})}</div>
-        <button class="del-btn" onclick="deleteTrade('${t.id}')" title="Delete">🗑</button>
-      </div>
-    </div>`;
+    const timeStr = t.createdAt?.seconds ? new Date(t.createdAt.seconds*1000).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"America/Chicago"}) : "";
+    return "<div class=\"log-item\" data-id=\"" + t.id + "\">" +
+      "<div class=\"swipe-delete-bg\">DEL</div>" +
+      "<div class=\"log-row\" data-id=\"" + t.id + "\">" +
+        "<div class=\"log-row-left\" onclick=\"openEditModal('" + t.id + "')\">"+
+          "<div class=\"log-ticker\">" + t.ticker + "</div>" +
+          "<div class=\"log-date\">" + t.date + (timeStr?" · "+timeStr:"") + "</div>" +
+        "</div>" +
+        "<div class=\"log-cum\">∑ $" + (runMap[t.id]||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}) + "</div>" +
+        "<div class=\"log-right-col\">" +
+          "<div class=\"log-net\" style=\"color:" + col + "\">" + (net>=0?"+":"") + "$" + Math.abs(net).toLocaleString("en-US",{minimumFractionDigits:2}) + "</div>" +
+          "<div class=\"log-gross\">Gross $" + (t.gross||0).toLocaleString("en-US",{minimumFractionDigits:2}) + "</div>" +
+          "<button class=\"edit-btn\" onclick=\"openEditModal('" + t.id + "')\" title=\"Edit\">edit</button>" +
+        "</div>" +
+      "</div>" +
+    "</div>";
   }).join("");
+  addSwipeListeners();
 }
-
 
 // ── UI HELPERS ─────────────────────────────────────────────────
 function setupUI() {
@@ -1638,31 +1746,65 @@ function updateDailyBanner() {
 
 // Swipe to delete on log rows
 function addSwipeListeners() {
-  document.querySelectorAll(".log-row[data-id]").forEach(row => {
-    let startX = 0, isDragging = false;
-    row.addEventListener("touchstart", e => { startX = e.touches[0].clientX; isDragging = true; }, {passive:true});
+  document.querySelectorAll(".log-item[data-id]").forEach(item => {
+    const row = item.querySelector(".log-row");
+    const bg  = item.querySelector(".swipe-delete-bg");
+    if (!row) return;
+    let startX = 0, curDx = 0, dragging = false;
+    row.addEventListener("touchstart", e => { startX = e.touches[0].clientX; dragging = false; curDx = 0; }, {passive:true});
     row.addEventListener("touchmove", e => {
-      if (!isDragging) return;
       const dx = startX - e.touches[0].clientX;
-      if (dx > 20) { row.classList.add("swiping"); row.style.transform = `translateX(-${Math.min(dx,80)}px)`; }
+      if (dx > 8) dragging = true;
+      if (dragging && dx > 0) {
+        curDx = Math.min(dx, 82);
+        row.style.transform = "translateX(-" + curDx + "px)";
+        row.style.background = "rgba(255,107,107," + (curDx/82*0.12).toFixed(2) + ")";
+        if (bg) bg.style.opacity = Math.min(curDx/72, 1).toFixed(2);
+      }
     }, {passive:true});
-    row.addEventListener("touchend", e => {
-      const dx = startX - e.changedTouches[0].clientX;
-      if (dx > 60) { deleteTrade(row.dataset.id); }
-      else { row.classList.remove("swiping"); row.style.transform = ""; }
-      isDragging = false;
+    row.addEventListener("touchend", () => {
+      if (curDx > 58) {
+        item.style.transition = "opacity .25s, max-height .3s";
+        item.style.opacity = "0";
+        item.style.maxHeight = "0";
+        item.style.overflow = "hidden";
+        setTimeout(() => {
+          deleteTrade(item.dataset.id);
+        }, 280);
+      } else {
+        row.style.transform = "";
+        row.style.background = "";
+        if (bg) bg.style.opacity = "0";
+      }
+      dragging = false; curDx = 0;
     });
   });
 }
 
 window.openModal = () => {
+  editingTradeId = null;
+  const ml2 = document.getElementById("modal-mode-label"); if(ml2) ml2.textContent = "➕ Add Trade";
+  document.querySelector(".submit-btn").textContent = "Save Trade";
+  document.querySelector(".submit-btn").onclick = () => addTrade();
+  document.getElementById("f-gross").value = "";
+  document.getElementById("f-fees").value = "";
+  document.getElementById("f-ticker").value = "";
+  const signBtn = document.getElementById("sign-toggle");
+  if (signBtn) { signBtn.textContent = "+"; signBtn.style.color = "var(--green)"; signBtn.style.borderColor = "rgba(255,255,255,0.12)"; signBtn.style.background = "rgba(255,255,255,0.05)"; }
+  document.querySelectorAll(".chip").forEach(c => c.classList.remove("selected"));
+  const dateInput = document.getElementById("f-date");
+  if (dateInput) dateInput.value = localDateStr();
   document.getElementById("trade-modal").classList.add("open");
   document.getElementById("f-ticker").focus();
 };
 window.closeModal = () => {
   document.getElementById("trade-modal").classList.remove("open");
+  editingTradeId = null;
+  const ml3 = document.getElementById("modal-mode-label"); if(ml3) ml3.textContent = "➕ Add Trade";
+  document.querySelector(".submit-btn").textContent = "Save Trade";
+  document.querySelector(".submit-btn").onclick = () => addTrade();
   const btn = document.getElementById("sign-toggle");
-  if (btn) { btn.textContent = "+"; btn.style.color = "var(--green)"; btn.style.borderColor = "rgba(255,255,255,0.12)"; }
+  if (btn) { btn.textContent = "+"; btn.style.color = "var(--green)"; btn.style.borderColor = "rgba(255,255,255,0.12)"; btn.style.background = "rgba(255,255,255,0.05)"; }
 };
 
 function showToast(msg, isErr=false) {
@@ -1878,6 +2020,28 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .log-filter-btn.active{background:rgba(0,245,160,0.1);border-color:rgba(0,245,160,0.3);color:var(--green)}
 .log-filter-btn.active-red{background:rgba(255,107,107,0.1);border-color:rgba(255,107,107,0.3);color:var(--red)}
 .log-empty{text-align:center;padding:32px;color:var(--dim);font-family:var(--font-mono);font-size:11px}
+
+/* ── LOG DATE RANGE BAR ── */
+.log-date-bar{display:flex;gap:5px;overflow-x:auto;padding-bottom:8px;margin-bottom:4px;-webkit-overflow-scrolling:touch}
+.log-date-bar::-webkit-scrollbar{display:none}
+.log-date-btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:5px 10px;color:var(--dim);font-family:var(--font-mono);font-size:10px;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.log-date-btn.active{background:rgba(0,217,245,0.1);border-color:rgba(0,217,245,0.3);color:var(--cyan)}
+.log-custom-range{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.log-range-input{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 10px;color:#fff;font-family:var(--font-mono);font-size:10px;width:130px;outline:none}
+.log-range-input:focus{border-color:var(--cyan)}
+.log-range-go{background:rgba(0,217,245,0.1);border:1px solid rgba(0,217,245,0.25);border-radius:8px;padding:6px 12px;color:var(--cyan);font-family:var(--font-mono);font-size:10px;cursor:pointer}
+.log-count-note{font-family:var(--font-mono);font-size:9px;color:var(--dim);text-align:right;min-height:14px;margin-bottom:2px}
+
+/* ── LOG ROW REWRITE ── */
+.log-item{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden}
+.swipe-delete-bg{position:absolute;right:0;top:0;bottom:0;width:72px;background:var(--red);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1px;color:#fff;border-radius:0 12px 12px 0;opacity:0;pointer-events:none}
+.log-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px;display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;position:relative;transition:transform .25s ease,background .2s;will-change:transform}
+.log-row-left{cursor:pointer}
+.log-row-left:active .log-ticker{color:var(--cyan)}
+.log-cum{font-family:var(--font-mono);font-size:9px;color:#333;text-align:center}
+.log-right-col{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.edit-btn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:var(--dim);font-family:var(--font-mono);font-size:9px;cursor:pointer;padding:3px 7px;margin-top:3px;transition:all .15s}
+.edit-btn:active{background:rgba(0,245,160,0.1);border-color:rgba(0,245,160,0.25);color:var(--green)}
 
 /* ── LOGIN ── */
 #login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px;gap:24px;background:radial-gradient(ellipse at top,rgba(0,245,160,0.08) 0%,transparent 60%)}
@@ -2386,7 +2550,7 @@ service cloud.firestore {
   <div class="modal-overlay" id="trade-modal" onclick="if(event.target===this)closeModal()">
     <div class="modal">
       <div class="modal-title">
-        ➕ Add Trade
+        <span id="modal-mode-label">➕ Add Trade</span>
         <button class="close-btn" onclick="closeModal()">✕</button>
       </div>
 

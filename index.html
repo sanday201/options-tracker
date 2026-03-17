@@ -1395,7 +1395,7 @@ function showMilestonePop(ms, curVal) {
 // FEATURE: LOG SEARCH & FILTER
 // ══════════════════════════════════════════
 // log state — single source of truth
-const logState = { search: "", filter: "all", dateRange: "all", customFrom: "", customTo: "" };
+const logState = { search: "", filter: "all", dateRange: "all", customFrom: "", customTo: "", sort: "desc" };
 
 
 function tickUpKPIs() {
@@ -1435,10 +1435,14 @@ function buildLogBar() {
   if (!container) return;
   container.innerHTML = `
     <div class="log-search-bar">
-      <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." value="${logState.search}"/>
+      <div class="log-search-wrap">
+        <input class="log-search-input" id="log-search-input" placeholder="Search ticker..." value="${logState.search}"/>
+        <button class="log-search-clear" id="log-search-clear" style="display:${logState.search?'flex':'none'}">✕</button>
+      </div>
       <button class="log-filter-btn" id="lf-all">All</button>
       <button class="log-filter-btn" id="lf-wins">Wins</button>
       <button class="log-filter-btn" id="lf-losses">Losses</button>
+      <button class="log-filter-btn log-sort-btn" id="lf-sort" title="Sort order">↓ New</button>
     </div>
     <div class="log-date-bar" id="log-date-bar">
       <button class="log-date-btn" id="ldr-all">All Time</button>
@@ -1457,11 +1461,27 @@ function buildLogBar() {
     <div id="log-items-list"></div>`;
   document.getElementById("log-search-input").addEventListener("input", function() {
     logState.search = this.value;
+    const clr = document.getElementById("log-search-clear");
+    if (clr) clr.style.display = this.value ? "flex" : "none";
+    renderLogItems();
+  });
+  document.getElementById("log-search-clear").addEventListener("click", function() {
+    const inp = document.getElementById("log-search-input");
+    inp.value = "";
+    logState.search = "";
+    this.style.display = "none";
+    inp.focus();
     renderLogItems();
   });
   document.getElementById("lf-all").addEventListener("click", function() { setLogFilter("all"); });
   document.getElementById("lf-wins").addEventListener("click", function() { setLogFilter("wins"); });
   document.getElementById("lf-losses").addEventListener("click", function() { setLogFilter("losses"); });
+  document.getElementById("lf-sort").addEventListener("click", function() {
+    logState.sort = logState.sort === "desc" ? "asc" : "desc";
+    this.textContent = logState.sort === "desc" ? "↓ New" : "↑ Old";
+    this.classList.toggle("active", logState.sort === "asc");
+    renderLogItems();
+  });
 
   const dateRangeBtns = { all:"ldr-all", "7":"ldr-7", "30":"ldr-30", mtd:"ldr-mtd", custom:"ldr-custom" };
   Object.entries(dateRangeBtns).forEach(([range, btnId]) => {
@@ -1538,11 +1558,13 @@ function setLogFilter(f) {
 function renderLogItems() {
   const container = document.getElementById("log-items-list");
   if (!container) return;
+  const asc = logState.sort === "asc";
   const sorted = [...allTrades].sort((a, b) => {
-    if (b.date !== a.date) return b.date.localeCompare(a.date);
+    const dateCmp = asc ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+    if (dateCmp !== 0) return dateCmp;
     const aT = a.createdAt?.seconds || 0;
     const bT = b.createdAt?.seconds || 0;
-    return bT - aT;
+    return asc ? aT - bT : bT - aT;
   });
   const q = (logState.search||"").toLowerCase().trim();
   const f = logState.filter || "all";
@@ -2056,10 +2078,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 @keyframes pop-in{from{transform:scale(0.7);opacity:0}to{transform:scale(1);opacity:1}}
 
 /* ── LOG SEARCH ── */
+
+.log-search-wrap{position:relative;flex:1;min-width:0;display:flex;align-items:center}
+.log-search-wrap .log-search-input{width:100%;padding-right:30px}
+.log-search-clear{position:absolute;right:8px;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.12);border:none;color:#888;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:background .15s}
+.log-search-clear:active{background:rgba(255,255,255,0.2)}
+
 .log-search-bar{display:flex;gap:6px;margin-bottom:10px;padding:0 0 10px;border-bottom:1px solid rgba(255,255,255,0.06);align-items:center}
 .log-search-input{flex:1;min-width:0;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px 12px;color:#fff;font-family:var(--font-mono);font-size:11px;outline:none;transition:border-color .2s}
 .log-search-input:focus{border-color:rgba(0,245,160,0.4)}
 .log-filter-btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px 10px;color:var(--dim);font-family:var(--font-mono);font-size:10px;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
+
+.log-sort-btn{min-width:52px}
+.log-sort-btn.active{background:rgba(0,217,245,0.1);border-color:rgba(0,217,245,0.3);color:var(--cyan)}
+
 .log-filter-btn.active{background:rgba(0,245,160,0.1);border-color:rgba(0,245,160,0.3);color:var(--green)}
 .log-filter-btn.active-red{background:rgba(255,107,107,0.1);border-color:rgba(255,107,107,0.3);color:var(--red)}
 .log-empty{text-align:center;padding:32px;color:var(--dim);font-family:var(--font-mono);font-size:11px}

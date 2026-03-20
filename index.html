@@ -531,7 +531,6 @@ function renderAll() {
   renderTickerTape();
   renderKPIs();
   renderSparkline();
-  renderBestDay();
   renderPersonalRecords();
   renderCharts();
   renderMilestones();
@@ -2861,8 +2860,8 @@ service cloud.firestore {
     </div>
 
 
-    <!-- BEST DAY EVER -->
-    <div class="best-day-card" id="best-day-card">
+    <!-- MONTHLY GOAL RING -->
+    <div class="best-day-card" id="monthly-goal-ring-card" style="margin-bottom:10px">
       <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)">Loading...</div>
     </div>
 
@@ -2887,11 +2886,6 @@ service cloud.firestore {
 
     <!-- PERSONAL RECORDS -->
     <div class="kpi" id="personal-records-card" style="margin-bottom:10px;background:linear-gradient(135deg,rgba(255,190,11,0.05),rgba(199,125,255,0.03));border-color:rgba(255,190,11,0.1)">
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)">Loading...</div>
-    </div>
-
-    <!-- MONTHLY GOAL RING -->
-    <div class="best-day-card" id="monthly-goal-ring-card" style="margin-bottom:10px">
       <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)">Loading...</div>
     </div>
 

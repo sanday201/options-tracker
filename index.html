@@ -2835,7 +2835,7 @@ service cloud.firestore {
       <div class="user-row" style="flex-shrink:0;margin-top:2px">
         <img id="user-photo" src="" alt="" style="display:none"/>
         <span id="user-name"></span>
-        <button class="export-btn" id="export-btn">⬇ CSV</button>
+        <button id="theme-toggle-btn" onclick="cycleTheme()" title="Toggle theme" style="background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--muted);font-size:14px;padding:5px 9px;cursor:pointer;transition:all .2s;line-height:1">🌙</button><button class="export-btn" id="export-btn">⬇ CSV</button>
         <button class="signout-btn" onclick="signOutUser()">Sign out</button>
       </div>
     </div>

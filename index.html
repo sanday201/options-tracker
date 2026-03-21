@@ -527,6 +527,7 @@ function renderChipPnL() {
 
 function renderAll() {
   renderPaceAndGoal();
+  renderReturns();
   renderCalendar();
   renderTickerTape();
   renderKPIs();
@@ -753,6 +754,64 @@ function animateValue(el, start, end, duration, prefix="$", isInt=false) {
 
 
 let goalTarget = parseFloat(localStorage.getItem("goalTarget") || "200000");
+let startingCapital = parseFloat(localStorage.getItem("startingCapital") || "0");
+
+// ── RETURNS RENDERER ──────────────────────────────────────────
+function renderReturns() {
+  const s = computeStats();
+  const annualEl = document.getElementById("annual-return-val");
+  const annualSub = document.getElementById("annual-return-sub");
+  const monthlyEl = document.getElementById("monthly-return-val");
+  const monthlySub = document.getElementById("monthly-return-sub");
+  if (!annualEl) return;
+
+  if (!startingCapital || startingCapital <= 0) {
+    annualEl.textContent = "—";
+    annualSub.textContent = "Tap ✏ Set Capital";
+    monthlyEl.textContent = "—";
+    monthlySub.textContent = "Tap ✏ Set Capital";
+    annualEl.style.color = "var(--dim)";
+    monthlyEl.style.color = "var(--dim)";
+    return;
+  }
+
+  const annualPct = (s.ytdNet / startingCapital) * 100;
+  const monthlyPct = (s.mtd / startingCapital) * 100;
+  const fmtPct = n => (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
+  const fmtDollar = n => (n >= 0 ? "+" : "-") + "$" + Math.abs(n).toLocaleString("en-US", {maximumFractionDigits: 0});
+
+  annualEl.textContent = fmtPct(annualPct);
+  annualEl.style.color = annualPct >= 0 ? "var(--green)" : "var(--red)";
+  annualSub.textContent = fmtDollar(s.ytdNet) + " on $" + startingCapital.toLocaleString("en-US", {maximumFractionDigits: 0});
+
+  monthlyEl.textContent = fmtPct(monthlyPct);
+  monthlyEl.style.color = monthlyPct >= 0 ? "var(--cyan)" : "var(--red)";
+  monthlySub.textContent = fmtDollar(s.mtd) + " this month";
+}
+
+window.openCapitalModal = function() {
+  const overlay = document.getElementById("capital-modal-overlay");
+  const inp = document.getElementById("capital-modal-input");
+  if (!overlay || !inp) return;
+  inp.value = startingCapital > 0 ? startingCapital : "";
+  overlay.classList.add("open");
+  setTimeout(() => inp.focus(), 100);
+};
+
+window.closeCapitalModal = function() {
+  document.getElementById("capital-modal-overlay")?.classList.remove("open");
+};
+
+window.saveCapital = function() {
+  const val = parseFloat(document.getElementById("capital-modal-input")?.value);
+  if (!isNaN(val) && val > 0) {
+    startingCapital = val;
+    localStorage.setItem("startingCapital", startingCapital);
+    renderReturns();
+    closeCapitalModal();
+    showToast("✓ Starting capital saved!");
+  }
+};
 
 function renderPaceAndGoal() {
   const s = computeStats();
@@ -2318,6 +2377,11 @@ function bindGoalButtons() {
     overlay._bound = true;
     overlay.addEventListener("click", function(e) { if (e.target === overlay) closeGoalModal(); });
   }
+  const capOverlay = document.getElementById("capital-modal-overlay");
+  if (capOverlay && !capOverlay._bound) {
+    capOverlay._bound = true;
+    capOverlay.addEventListener("click", function(e) { if (e.target === capOverlay) closeCapitalModal(); });
+  }
 }
 </script>
 
@@ -2922,6 +2986,26 @@ service cloud.firestore {
       </div>
     </div>
 
+    <!-- RETURNS CARD -->
+    <div class="best-day-card" id="returns-card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted)">Portfolio Returns</div>
+        <button onclick="openCapitalModal()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:3px 10px;font-family:var(--font-mono);font-size:9px;color:var(--muted);cursor:pointer">✏ Set Capital</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="returns-display">
+        <div style="text-align:center">
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Annual Return</div>
+          <div style="font-size:26px;font-weight:800;color:var(--green)" id="annual-return-val">—</div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)" id="annual-return-sub">Set starting capital</div>
+        </div>
+        <div style="text-align:center;border-left:1px solid var(--border);padding-left:10px">
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Monthly Return</div>
+          <div style="font-size:26px;font-weight:800;color:var(--cyan)" id="monthly-return-val">—</div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)" id="monthly-return-sub">Set starting capital</div>
+        </div>
+      </div>
+    </div>
+
     <div class="kpi-grid">
       <div id="k-ytd" class="kpi kpi-green">
         <div class="kpi-glow" style="background:radial-gradient(circle at top right,rgba(0,245,160,0.15) 0%,transparent 70%)"></div>
@@ -3160,6 +3244,19 @@ service cloud.firestore {
   </div>
 </div>
 <!-- GOAL EDIT MODAL — at body level so nothing clips it -->
+<!-- STARTING CAPITAL MODAL -->
+<div class="goal-modal-overlay" id="capital-modal-overlay">
+  <div class="goal-modal-sheet">
+    <div class="goal-modal-title">💰 Set Starting Capital</div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6">Enter the account balance you started with on Jan 1st. This is used to calculate your annual and monthly return %.</div>
+    <input class="goal-modal-input" id="capital-modal-input" type="number" inputmode="numeric" placeholder="e.g. 50000"/>
+    <div class="goal-modal-btns">
+      <button class="goal-modal-cancel" onclick="closeCapitalModal()">Cancel</button>
+      <button class="goal-modal-save" onclick="saveCapital()">Save Capital</button>
+    </div>
+  </div>
+</div>
+
 <div class="goal-modal-overlay" id="goal-modal-overlay">
   <div class="goal-modal-sheet">
     <div class="goal-modal-title">🎯 Set Annual Goal</div>

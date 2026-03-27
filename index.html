@@ -2398,7 +2398,7 @@ function bindGoalButtons() {
 
     if (isNaN(s) || isNaN(c) || s === 0) {
       result.style.borderColor = "#1e2a40";
-      result.innerHTML = '<div style="font-family:var(--font-mono);font-size:13px;color:#3a4a6a">Enter both prices above</div>';
+      result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter both prices above</div>';
       return;
     }
 
@@ -2413,17 +2413,11 @@ function bindGoalButtons() {
 
     result.style.borderColor = border;
     result.innerHTML = `
-      <div style="font-size:52px;font-weight:800;color:${color};letter-spacing:-2px;line-height:1;font-family:var(--font-display)">${arrow} ${Math.abs(pct).toFixed(2)}%</div>
-      <div style="font-size:14px;color:${color};margin-top:8px;font-family:var(--font-mono)">${sign}$${Math.abs(change).toFixed(2)} per share</div>
-      <div style="display:flex;justify-content:space-around;margin-top:18px;padding-top:14px;border-top:1px solid #1e2a40">
-        <div>
-          <div style="font-family:var(--font-mono);font-size:9px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Start</div>
-          <div style="font-size:15px;color:#aabbcc;font-weight:600;margin-top:4px">$${s.toFixed(2)}</div>
-        </div>
-        <div>
-          <div style="font-family:var(--font-mono);font-size:9px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Current</div>
-          <div style="font-size:15px;color:#aabbcc;font-weight:600;margin-top:4px">$${c.toFixed(2)}</div>
-        </div>
+      <div style="font-size:48px;font-weight:800;color:${color};letter-spacing:-2px;line-height:1;font-family:var(--font-display)">${arrow} ${Math.abs(pct).toFixed(2)}%</div>
+      <div style="font-size:13px;color:${color};margin-top:7px;font-family:var(--font-mono)">${sign}$${Math.abs(change).toFixed(2)} per share</div>
+      <div style="display:flex;justify-content:space-around;margin-top:14px;padding-top:12px;border-top:1px solid #1e2a40">
+        <div><div style="font-family:var(--font-mono);font-size:8px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Start</div><div style="font-size:14px;color:#aabbcc;font-weight:700;margin-top:3px">$${s.toFixed(2)}</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:8px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Current</div><div style="font-size:14px;color:#aabbcc;font-weight:700;margin-top:3px">$${c.toFixed(2)}</div></div>
       </div>`;
   }
 
@@ -2433,7 +2427,86 @@ function bindGoalButtons() {
     document.getElementById("calc-clear-btn").style.display = "none";
     const result = document.getElementById("calc-result");
     result.style.borderColor = "#1e2a40";
-    result.innerHTML = '<div style="font-family:var(--font-mono);font-size:13px;color:#3a4a6a">Enter both prices above</div>';
+    result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter both prices above</div>';
+  }
+
+  // ── PREMIUM RETURN CALCULATOR ─────────────────────────
+  function premUpdate() {
+    const prem    = parseFloat(document.getElementById("prem-premium").value);
+    const cap     = parseFloat(document.getElementById("prem-capital").value);
+    const expiry  = document.getElementById("prem-expiry").value;
+    const result  = document.getElementById("prem-result");
+    const clrBtn  = document.getElementById("prem-clear-btn");
+    const dayLbl  = document.getElementById("prem-days-label");
+
+    const hasAny = document.getElementById("prem-premium").value || document.getElementById("prem-capital").value || expiry;
+    clrBtn.style.display = hasAny ? "block" : "none";
+
+    let days = null;
+    if (expiry) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const exp   = new Date(expiry + "T00:00:00");
+      days = Math.round((exp - today) / 86400000);
+      dayLbl.textContent = days > 0 ? days + " days until expiry" : days === 0 ? "Expires today" : Math.abs(days) + " days ago";
+      dayLbl.style.color = days < 0 ? "var(--red)" : "#3a4a6a";
+    } else {
+      dayLbl.textContent = "";
+    }
+
+    if (isNaN(prem) || isNaN(cap) || cap === 0 || days === null) {
+      result.style.borderColor = "#1e2a40";
+      result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter premium, capital, and expiry</div>';
+      return;
+    }
+
+    const posPct  = (prem / cap) * 100;
+    const monthly = days > 0 ? (posPct / days) * 30 : 0;
+    const annual  = days > 0 ? (posPct / days) * 365 : 0;
+    const absDays = Math.abs(days);
+    const expired = days < 0;
+
+    result.style.borderColor = "#1a3a1a";
+    result.innerHTML = `
+      <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:5px">Monthly Return</div>
+      <div style="font-size:44px;font-weight:800;color:var(--green);letter-spacing:-2px;line-height:1;font-family:var(--font-display)">${monthly.toFixed(2)}%</div>
+      <div style="font-size:11px;color:var(--green);margin-top:5px;font-family:var(--font-mono)">$${prem.toFixed(0)} on $${cap.toLocaleString()} · ${absDays} days${expired ? " (expired)" : ""}</div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <div style="flex:1;background:#0d1420;border:1px solid #1e2a40;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-family:var(--font-mono);font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:4px">Position Return</div>
+          <div style="font-size:15px;font-weight:800;color:#00d4f5">${posPct.toFixed(2)}%</div>
+        </div>
+        <div style="flex:1;background:#0d1420;border:1px solid #1e2a40;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-family:var(--font-mono);font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:4px">Annualized</div>
+          <div style="font-size:15px;font-weight:800;color:var(--amber)">${annual.toFixed(1)}%</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-around;margin-top:12px;padding-top:12px;border-top:1px solid #1e2a40">
+        <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Premium</div><div style="font-size:12px;color:#aabbcc;font-weight:700;margin-top:3px">$${prem.toFixed(0)}</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Capital</div><div style="font-size:12px;color:#aabbcc;font-weight:700;margin-top:3px">$${cap.toLocaleString()}</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Days</div><div style="font-size:12px;color:#aabbcc;font-weight:700;margin-top:3px">${absDays}</div></div>
+      </div>`;
+  }
+
+  function premClear() {
+    ["prem-premium","prem-capital","prem-expiry"].forEach(id => { const el = document.getElementById(id); if(el) el.value = ""; });
+    document.getElementById("prem-clear-btn").style.display = "none";
+    document.getElementById("prem-days-label").textContent = "";
+    const result = document.getElementById("prem-result");
+    result.style.borderColor = "#1e2a40";
+    result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter premium, capital, and expiry</div>';
+  }
+
+  // ── CALC TAB TOGGLE ────────────────────────────────────
+  function calcSwitchTab(tab) {
+    const isPrice = tab === "price";
+    document.getElementById("calc-screen-price").style.display   = isPrice ? "block" : "none";
+    document.getElementById("calc-screen-premium").style.display = isPrice ? "none"  : "block";
+    const tPrice   = document.getElementById("calc-tog-price");
+    const tPremium = document.getElementById("calc-tog-premium");
+    tPrice.style.background   = isPrice ? "#0d2a1a" : "transparent";
+    tPrice.style.color        = isPrice ? "#00C805" : "#3a4a6a";
+    tPremium.style.background = isPrice ? "transparent" : "#0d2a1a";
+    tPremium.style.color      = isPrice ? "#3a4a6a" : "#00C805";
   }
 
   // Wire up directly — already inside DOMContentLoaded
@@ -2443,6 +2516,17 @@ function bindGoalButtons() {
   if (calcStartEl) calcStartEl.addEventListener("input", calcUpdate);
   if (calcCurEl)   calcCurEl.addEventListener("input", calcUpdate);
   if (calcClrBtn)  calcClrBtn.addEventListener("click", calcClear);
+
+  const premPremEl  = document.getElementById("prem-premium");
+  const premCapEl   = document.getElementById("prem-capital");
+  const premExpEl   = document.getElementById("prem-expiry");
+  if (premPremEl) premPremEl.addEventListener("input", premUpdate);
+  if (premCapEl)  premCapEl.addEventListener("input", premUpdate);
+  if (premExpEl)  premExpEl.addEventListener("change", premUpdate);
+
+  window.calcSwitchTab = calcSwitchTab;
+  window.calcClear     = calcClear;
+  window.premClear     = premClear;
 }
 </script>
 
@@ -3283,29 +3367,75 @@ service cloud.firestore {
 
   <!-- ── CALC PAGE ── -->
   <div class="page" id="page-calc">
-    <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:16px">Price Change Calculator</div>
-    <div style="margin-bottom:14px">
-      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:6px">Starting Price</div>
-      <div style="position:relative">
-        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:16px">$</span>
-        <input id="calc-start" type="number" inputmode="decimal" placeholder="0.00" step="0.01"
-          style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:14px 14px 14px 28px;color:#fff;font-size:20px;font-weight:700;outline:none;font-family:var(--font-display)"
-          onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+
+    <!-- TOGGLE -->
+    <div style="display:flex;background:#111520;border-radius:10px;padding:3px;margin-bottom:16px;border:1px solid #1e2a40">
+      <button id="calc-tog-price" onclick="calcSwitchTab('price')" style="flex:1;padding:9px 6px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:0.5px;border:none;cursor:pointer;background:#0d2a1a;color:#00C805;transition:all .2s">Price Change</button>
+      <button id="calc-tog-premium" onclick="calcSwitchTab('premium')" style="flex:1;padding:9px 6px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:0.5px;border:none;cursor:pointer;background:transparent;color:#3a4a6a;transition:all .2s">Premium Return</button>
+    </div>
+
+    <!-- PRICE CHANGE SCREEN -->
+    <div id="calc-screen-price">
+      <div style="margin-bottom:12px">
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">Starting Price</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:15px;font-weight:600">$</span>
+          <input id="calc-start" type="number" inputmode="decimal" placeholder="0.00" step="0.01"
+            style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:13px 13px 13px 26px;color:#fff;font-size:20px;font-weight:700;outline:none;font-family:var(--font-display)"
+            onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+        </div>
       </div>
-    </div>
-    <div style="margin-bottom:14px">
-      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:6px">Current Price</div>
-      <div style="position:relative">
-        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:16px">$</span>
-        <input id="calc-current" type="number" inputmode="decimal" placeholder="0.00" step="0.01"
-          style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:14px 14px 14px 28px;color:#fff;font-size:20px;font-weight:700;outline:none;font-family:var(--font-display)"
-          onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+      <div style="margin-bottom:12px">
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">Current Price</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:15px;font-weight:600">$</span>
+          <input id="calc-current" type="number" inputmode="decimal" placeholder="0.00" step="0.01"
+            style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:13px 13px 13px 26px;color:#fff;font-size:20px;font-weight:700;outline:none;font-family:var(--font-display)"
+            onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+        </div>
       </div>
+      <div id="calc-result" style="background:#111520;border:1px solid #1e2a40;border-radius:12px;padding:20px;text-align:center;transition:border-color 0.3s">
+        <div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter both prices above</div>
+      </div>
+      <button id="calc-clear-btn" onclick="calcClear()" style="display:none;width:100%;margin-top:10px;padding:11px;background:transparent;border:1px solid #1e2a40;border-radius:10px;color:#3a4a6a;font-family:var(--font-mono);font-size:11px;cursor:pointer">Clear</button>
     </div>
-    <div id="calc-result" style="background:#111520;border:1px solid #1e2a40;border-radius:14px;padding:24px;text-align:center;transition:border-color 0.3s">
-      <div style="font-family:var(--font-mono);font-size:13px;color:#3a4a6a">Enter both prices above</div>
+
+    <!-- PREMIUM RETURN SCREEN -->
+    <div id="calc-screen-premium" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">Premium</div>
+          <div style="position:relative">
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:15px;font-weight:600">$</span>
+            <input id="prem-premium" type="number" inputmode="decimal" placeholder="0.00" step="0.01"
+              style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:13px 10px 13px 26px;color:#fff;font-size:18px;font-weight:700;outline:none;font-family:var(--font-display)"
+              onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+          </div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">Capital at Risk</div>
+          <div style="position:relative">
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:15px;font-weight:600">$</span>
+            <input id="prem-capital" type="number" inputmode="decimal" placeholder="0.00" step="0.01"
+              style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:13px 10px 13px 26px;color:#fff;font-size:18px;font-weight:700;outline:none;font-family:var(--font-display)"
+              onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+          </div>
+          <div style="font-size:9px;color:#2a3a50;margin-top:4px;font-style:italic">Use max loss for spreads</div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">Expiry Date</div>
+        <input id="prem-expiry" type="date"
+          style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:13px 12px;color:#aabbcc;font-size:15px;font-weight:600;outline:none;font-family:var(--font-display);appearance:none;-webkit-appearance:none"
+          onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+        <div id="prem-days-label" style="font-size:9px;color:#3a4a6a;margin-top:4px;text-align:right"></div>
+      </div>
+      <div id="prem-result" style="background:#111520;border:1px solid #1e2a40;border-radius:12px;padding:20px;text-align:center;transition:border-color 0.3s">
+        <div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter premium, capital, and expiry</div>
+      </div>
+      <button id="prem-clear-btn" onclick="premClear()" style="display:none;width:100%;margin-top:10px;padding:11px;background:transparent;border:1px solid #1e2a40;border-radius:10px;color:#3a4a6a;font-family:var(--font-mono);font-size:11px;cursor:pointer">Clear</button>
     </div>
-    <button id="calc-clear-btn" style="display:none;width:100%;margin-top:12px;padding:12px;background:transparent;border:1px solid #1e2a40;border-radius:10px;color:#3a4a6a;font-family:var(--font-mono);font-size:12px;cursor:pointer">Clear</button>
+
   </div>
 
 </div><!-- end app-screen -->

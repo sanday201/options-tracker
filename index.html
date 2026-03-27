@@ -2383,6 +2383,60 @@ function bindGoalButtons() {
     capOverlay.addEventListener("click", function(e) { if (e.target === capOverlay) closeCapitalModal(); });
   }
 }
+
+// ── PRICE CHANGE CALCULATOR ───────────────────────────────
+function calcUpdate() {
+  const startVal = parseFloat(document.getElementById("calc-start").value);
+  const curVal   = parseFloat(document.getElementById("calc-current").value);
+  const result   = document.getElementById("calc-result");
+  const clearBtn = document.getElementById("calc-clear-btn");
+
+  const hasInput = document.getElementById("calc-start").value || document.getElementById("calc-current").value;
+  clearBtn.style.display = hasInput ? "block" : "none";
+
+  if (isNaN(startVal) || isNaN(curVal) || startVal === 0) {
+    result.style.borderColor = "#1e2a40";
+    result.innerHTML = '<div style="font-family:var(--font-mono);font-size:13px;color:#3a4a6a">Enter both prices above</div>';
+    return;
+  }
+
+  const pct    = ((curVal - startVal) / startVal) * 100;
+  const change = curVal - startVal;
+  const isUp   = pct > 0;
+  const isFlat = pct === 0;
+  const color  = isFlat ? "#8a8a8a" : isUp ? "var(--green)" : "var(--red)";
+  const border = isFlat ? "#1e2a40" : isUp ? "#1a3a1a" : "#3a1a1a";
+  const arrow  = isFlat ? "—" : isUp ? "▲" : "▼";
+  const sign   = change >= 0 ? "+" : "";
+
+  result.style.borderColor = border;
+  result.innerHTML = `
+    <div style="font-size:52px;font-weight:800;color:${color};letter-spacing:-2px;line-height:1;font-family:var(--font-display)">
+      ${arrow} ${Math.abs(pct).toFixed(2)}%
+    </div>
+    <div style="font-size:14px;color:${color};margin-top:8px;font-family:var(--font-mono)">
+      ${sign}$${Math.abs(change).toFixed(2)} per share
+    </div>
+    <div style="display:flex;justify-content:space-around;margin-top:18px;padding-top:14px;border-top:1px solid #1e2a40">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Start</div>
+        <div style="font-size:15px;color:#aabbcc;font-weight:600;margin-top:4px;font-family:var(--font-display)">$${startVal.toFixed(2)}</div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Current</div>
+        <div style="font-size:15px;color:#aabbcc;font-weight:600;margin-top:4px;font-family:var(--font-display)">$${curVal.toFixed(2)}</div>
+      </div>
+    </div>`;
+}
+
+function calcClear() {
+  document.getElementById("calc-start").value = "";
+  document.getElementById("calc-current").value = "";
+  document.getElementById("calc-clear-btn").style.display = "none";
+  const result = document.getElementById("calc-result");
+  result.style.borderColor = "#1e2a40";
+  result.innerHTML = '<div style="font-family:var(--font-mono);font-size:13px;color:#3a4a6a">Enter both prices above</div>';
+}
 </script>
 
 <style>
@@ -2933,6 +2987,7 @@ service cloud.firestore {
     <button class="nav-btn" data-page="tickers">TICKERS</button>
     <button class="nav-btn" data-page="charts">CHARTS</button>
     <button class="nav-btn" data-page="log">LOG</button>
+    <button class="nav-btn" data-page="calc">CALC</button>
   </nav>
 
   <!-- ── DASHBOARD PAGE ── -->
@@ -3216,6 +3271,42 @@ service cloud.firestore {
 
       <button class="submit-btn" onclick="addTrade()">Save Trade</button>
     </div>
+  </div>
+
+
+  <!-- ── CALC PAGE ── -->
+  <div class="page" id="page-calc">
+    <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:16px">Price Change Calculator</div>
+
+    <div style="margin-bottom:14px">
+      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:6px">Starting Price</div>
+      <div style="position:relative">
+        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:16px">$</span>
+        <input id="calc-start" type="number" inputmode="decimal" placeholder="0.00" step="0.01"
+          style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:14px 14px 14px 28px;color:#fff;font-size:20px;font-weight:700;outline:none;font-family:var(--font-display)"
+          oninput="calcUpdate()"
+          onfocus="this.style.borderColor='#2e3a50'"
+          onblur="this.style.borderColor='#1e2a40'"/>
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:6px">Current Price</div>
+      <div style="position:relative">
+        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:16px">$</span>
+        <input id="calc-current" type="number" inputmode="decimal" placeholder="0.00" step="0.01"
+          style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:14px 14px 14px 28px;color:#fff;font-size:20px;font-weight:700;outline:none;font-family:var(--font-display)"
+          oninput="calcUpdate()"
+          onfocus="this.style.borderColor='#2e3a50'"
+          onblur="this.style.borderColor='#1e2a40'"/>
+      </div>
+    </div>
+
+    <div id="calc-result" style="background:#111520;border:1px solid #1e2a40;border-radius:14px;padding:24px;text-align:center;transition:border-color 0.3s">
+      <div style="font-family:var(--font-mono);font-size:13px;color:#3a4a6a">Enter both prices above</div>
+    </div>
+
+    <button id="calc-clear-btn" onclick="calcClear()" style="display:none;width:100%;margin-top:12px;padding:12px;background:transparent;border:1px solid #1e2a40;border-radius:10px;color:#3a4a6a;font-family:var(--font-mono);font-size:12px;cursor:pointer">Clear</button>
   </div>
 
 </div><!-- end app-screen -->

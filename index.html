@@ -2498,35 +2498,139 @@ function bindGoalButtons() {
 
   // ── CALC TAB TOGGLE ────────────────────────────────────
   function calcSwitchTab(tab) {
-    const isPrice = tab === "price";
-    document.getElementById("calc-screen-price").style.display   = isPrice ? "block" : "none";
-    document.getElementById("calc-screen-premium").style.display = isPrice ? "none"  : "block";
-    const tPrice   = document.getElementById("calc-tog-price");
-    const tPremium = document.getElementById("calc-tog-premium");
-    tPrice.style.background   = isPrice ? "#0d2a1a" : "transparent";
-    tPrice.style.color        = isPrice ? "#00C805" : "#3a4a6a";
-    tPremium.style.background = isPrice ? "transparent" : "#0d2a1a";
-    tPremium.style.color      = isPrice ? "#3a4a6a" : "#00C805";
+    ["price","premium","ticker"].forEach(t => {
+      document.getElementById("calc-screen-" + t).style.display = t === tab ? "block" : "none";
+      const btn = document.getElementById("calc-tog-" + t);
+      btn.style.background = t === tab ? "#0d2a1a" : "transparent";
+      btn.style.color      = t === tab ? "#00C805" : "#3a4a6a";
+    });
+    if (tab === "ticker") tkrBuildChips();
   }
 
-  // Wire up directly — already inside DOMContentLoaded
-  const calcStartEl = document.getElementById("calc-start");
-  const calcCurEl   = document.getElementById("calc-current");
-  const calcClrBtn  = document.getElementById("calc-clear-btn");
-  if (calcStartEl) calcStartEl.addEventListener("input", calcUpdate);
-  if (calcCurEl)   calcCurEl.addEventListener("input", calcUpdate);
-  if (calcClrBtn)  calcClrBtn.addEventListener("click", calcClear);
+  // ── TICKER RETURN CALCULATOR ───────────────────────────
+  function tkrBuildChips() {
+    const container = document.getElementById("tkr-chips");
+    if (!container) return;
+    const tickers = [...new Set(allTrades.map(t => t.ticker))].sort();
+    container.innerHTML = tickers.map(t =>
+      `<div onclick="tkrSelectChip('${t}')" style="padding:5px 10px;border-radius:8px;font-size:10px;font-weight:700;background:#111520;border:1px solid #1e2a40;color:#555;cursor:pointer" id="tkr-chip-${t}">${t}</div>`
+    ).join("");
+  }
 
-  const premPremEl  = document.getElementById("prem-premium");
-  const premCapEl   = document.getElementById("prem-capital");
-  const premExpEl   = document.getElementById("prem-expiry");
-  if (premPremEl) premPremEl.addEventListener("input", premUpdate);
-  if (premCapEl)  premCapEl.addEventListener("input", premUpdate);
-  if (premExpEl)  premExpEl.addEventListener("change", premUpdate);
+  function tkrSelectChip(ticker) {
+    document.getElementById("tkr-ticker").value = ticker;
+    document.querySelectorAll("[id^='tkr-chip-']").forEach(c => {
+      c.style.background = "#111520"; c.style.borderColor = "#1e2a40"; c.style.color = "#555";
+    });
+    const chip = document.getElementById("tkr-chip-" + ticker);
+    if (chip) { chip.style.background = "#0d2a1a"; chip.style.borderColor = "#00C805"; chip.style.color = "#00C805"; }
+    tkrUpdate();
+  }
+
+  function tkrUpdate() {
+    const ticker  = (document.getElementById("tkr-ticker").value || "").trim().toUpperCase();
+    const fromVal = document.getElementById("tkr-from").value;
+    const toVal   = document.getElementById("tkr-to").value;
+    const capital = parseFloat(document.getElementById("tkr-capital").value);
+    const result  = document.getElementById("tkr-result");
+    const clrBtn  = document.getElementById("tkr-clear-btn");
+
+    const hasAny = ticker || fromVal || toVal || document.getElementById("tkr-capital").value;
+    clrBtn.style.display = hasAny ? "block" : "none";
+
+    if (!ticker || !fromVal || !toVal || isNaN(capital) || capital === 0) {
+      result.style.borderColor = "#1e2a40";
+      result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Select ticker, date range, and capital</div>';
+      return;
+    }
+
+    const from = new Date(fromVal + "T00:00:00");
+    const to   = new Date(toVal   + "T23:59:59");
+
+    if (from > to) {
+      result.style.borderColor = "#3a1a1a";
+      result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:var(--red)">From date must be before To date</div>';
+      return;
+    }
+
+    const matched = allTrades.filter(t => {
+      const d = new Date(t.date + "T00:00:00");
+      return t.ticker.toUpperCase() === ticker && d >= from && d <= to;
+    });
+
+    if (matched.length === 0) {
+      result.style.borderColor = "#1e2a40";
+      result.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">No ${ticker} trades found in this range</div>`;
+      return;
+    }
+
+    const totalPrem = matched.reduce((s, t) => s + (t.net || 0), 0);
+    const days      = Math.round((to - from) / 86400000) + 1;
+    const roC       = (totalPrem / capital) * 100;
+    const monthly   = (roC / days) * 30;
+    const annual    = (roC / days) * 365;
+    const isPos     = totalPrem >= 0;
+    const color     = isPos ? "var(--green)" : "var(--red)";
+    const border    = isPos ? "#1a3a1a"      : "#3a1a1a";
+    const sign      = isPos ? "+" : "";
+
+    result.style.borderColor = border;
+    result.innerHTML = `
+      <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:4px">Return on Capital</div>
+      <div style="font-size:44px;font-weight:800;color:${color};letter-spacing:-2px;line-height:1;font-family:var(--font-display)">${sign}${roC.toFixed(2)}%</div>
+      <div style="font-size:11px;color:${color};margin-top:5px;font-family:var(--font-mono)">${sign}$${Math.abs(totalPrem).toFixed(0)} collected · ${days} days</div>
+      <div style="display:inline-block;background:${isPos?"#0d2a1a":"#2a0d0d"};border:1px solid ${border};border-radius:6px;padding:3px 10px;font-size:9px;color:${color};font-weight:700;margin-top:6px">${matched.length} ${ticker} trades in range</div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <div style="flex:1;background:#0d1420;border:1px solid #1e2a40;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-family:var(--font-mono);font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:3px">Monthly</div>
+          <div style="font-size:15px;font-weight:800;color:var(--green)">${monthly.toFixed(2)}%</div>
+        </div>
+        <div style="flex:1;background:#0d1420;border:1px solid #1e2a40;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-family:var(--font-mono);font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:3px">Annualized</div>
+          <div style="font-size:15px;font-weight:800;color:var(--amber)">${annual.toFixed(1)}%</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-around;margin-top:12px;padding-top:12px;border-top:1px solid #1e2a40">
+        <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Premium</div><div style="font-size:11px;color:#aabbcc;font-weight:700;margin-top:3px">${sign}$${Math.abs(totalPrem).toFixed(0)}</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Capital</div><div style="font-size:11px;color:#aabbcc;font-weight:700;margin-top:3px">$${capital.toLocaleString()}</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Trades</div><div style="font-size:11px;color:#aabbcc;font-weight:700;margin-top:3px">${matched.length}</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Days</div><div style="font-size:11px;color:#aabbcc;font-weight:700;margin-top:3px">${days}</div></div>
+      </div>`;
+  }
+
+  function tkrClear() {
+    ["tkr-ticker","tkr-from","tkr-to","tkr-capital"].forEach(id => { const el = document.getElementById(id); if(el) el.value = ""; });
+    document.getElementById("tkr-clear-btn").style.display = "none";
+    document.querySelectorAll("[id^='tkr-chip-']").forEach(c => {
+      c.style.background = "#111520"; c.style.borderColor = "#1e2a40"; c.style.color = "#555";
+    });
+    const result = document.getElementById("tkr-result");
+    result.style.borderColor = "#1e2a40";
+    result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Select ticker, date range, and capital</div>';
+  }
 
   window.calcSwitchTab = calcSwitchTab;
   window.calcClear     = calcClear;
   window.premClear     = premClear;
+  window.tkrClear      = tkrClear;
+  window.tkrSelectChip = tkrSelectChip;
+
+  // Wire up ticker inputs
+  const tkrTickerEl  = document.getElementById("tkr-ticker");
+  const tkrFromEl    = document.getElementById("tkr-from");
+  const tkrToEl      = document.getElementById("tkr-to");
+  const tkrCapEl     = document.getElementById("tkr-capital");
+  if (tkrTickerEl) tkrTickerEl.addEventListener("input", tkrUpdate);
+  if (tkrFromEl)   tkrFromEl.addEventListener("change", tkrUpdate);
+  if (tkrToEl)     tkrToEl.addEventListener("change", tkrUpdate);
+  if (tkrCapEl)    tkrCapEl.addEventListener("input", tkrUpdate);
+
+  // Default date range: Jan 1 of current year → today
+  const _today = new Date();
+  const _todayStr = _today.toISOString().split("T")[0];
+  const _janStr   = _today.getFullYear() + "-01-01";
+  if (tkrFromEl) tkrFromEl.value = _janStr;
+  if (tkrToEl)   tkrToEl.value   = _todayStr;
 }
 </script>
 
@@ -3370,8 +3474,9 @@ service cloud.firestore {
 
     <!-- TOGGLE -->
     <div style="display:flex;background:#111520;border-radius:10px;padding:3px;margin-bottom:16px;border:1px solid #1e2a40">
-      <button id="calc-tog-price" onclick="calcSwitchTab('price')" style="flex:1;padding:9px 6px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:0.5px;border:none;cursor:pointer;background:#0d2a1a;color:#00C805;transition:all .2s">Price Change</button>
-      <button id="calc-tog-premium" onclick="calcSwitchTab('premium')" style="flex:1;padding:9px 6px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:0.5px;border:none;cursor:pointer;background:transparent;color:#3a4a6a;transition:all .2s">Premium Return</button>
+      <button id="calc-tog-price" onclick="calcSwitchTab('price')" style="flex:1;padding:8px 4px;border-radius:8px;font-size:9.5px;font-weight:700;letter-spacing:0.3px;border:none;cursor:pointer;background:#0d2a1a;color:#00C805;transition:all .2s">% Change</button>
+      <button id="calc-tog-premium" onclick="calcSwitchTab('premium')" style="flex:1;padding:8px 4px;border-radius:8px;font-size:9.5px;font-weight:700;letter-spacing:0.3px;border:none;cursor:pointer;background:transparent;color:#3a4a6a;transition:all .2s">Premium %</button>
+      <button id="calc-tog-ticker" onclick="calcSwitchTab('ticker')" style="flex:1;padding:8px 4px;border-radius:8px;font-size:9.5px;font-weight:700;letter-spacing:0.3px;border:none;cursor:pointer;background:transparent;color:#3a4a6a;transition:all .2s">Ticker Return</button>
     </div>
 
     <!-- PRICE CHANGE SCREEN -->
@@ -3434,6 +3539,44 @@ service cloud.firestore {
         <div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter premium, capital, and expiry</div>
       </div>
       <button id="prem-clear-btn" onclick="premClear()" style="display:none;width:100%;margin-top:10px;padding:11px;background:transparent;border:1px solid #1e2a40;border-radius:10px;color:#3a4a6a;font-family:var(--font-mono);font-size:11px;cursor:pointer">Clear</button>
+    </div>
+
+    <!-- TICKER RETURN SCREEN -->
+    <div id="calc-screen-ticker" style="display:none">
+      <div style="margin-bottom:12px">
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">Ticker</div>
+        <input id="tkr-ticker" type="text" placeholder="e.g. SOFI" autocapitalize="characters" autocomplete="off"
+          style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:12px;color:#00C805;font-size:22px;font-weight:800;outline:none;letter-spacing:2px;text-align:center;text-transform:uppercase"
+          onfocus="this.style.borderColor='#1a3a1a'" onblur="this.style.borderColor='#1e2a40'"/>
+      </div>
+      <div id="tkr-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">From</div>
+          <input id="tkr-from" type="date"
+            style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:11px 8px;color:#aabbcc;font-size:13px;font-weight:600;outline:none;appearance:none;-webkit-appearance:none"
+            onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">To</div>
+          <input id="tkr-to" type="date"
+            style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:11px 8px;color:#aabbcc;font-size:13px;font-weight:600;outline:none;appearance:none;-webkit-appearance:none"
+            onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">Capital Allocated</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:15px;font-weight:600">$</span>
+          <input id="tkr-capital" type="number" inputmode="decimal" placeholder="0.00" step="0.01"
+            style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:13px 13px 13px 26px;color:#fff;font-size:20px;font-weight:700;outline:none"
+            onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
+        </div>
+      </div>
+      <div id="tkr-result" style="background:#111520;border:1px solid #1e2a40;border-radius:12px;padding:20px;text-align:center;transition:border-color 0.3s">
+        <div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Select ticker, date range, and capital</div>
+      </div>
+      <button id="tkr-clear-btn" onclick="tkrClear()" style="display:none;width:100%;margin-top:10px;padding:11px;background:transparent;border:1px solid #1e2a40;border-radius:10px;color:#3a4a6a;font-family:var(--font-mono);font-size:11px;cursor:pointer">Clear</button>
     </div>
 
   </div>

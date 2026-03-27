@@ -2436,15 +2436,13 @@ function bindGoalButtons() {
     result.innerHTML = '<div style="font-family:var(--font-mono);font-size:13px;color:#3a4a6a">Enter both prices above</div>';
   }
 
-  // Wire up after DOM ready
-  document.addEventListener("DOMContentLoaded", function() {
-    const s = document.getElementById("calc-start");
-    const c = document.getElementById("calc-current");
-    const clr = document.getElementById("calc-clear-btn");
-    if (s) s.addEventListener("input", calcUpdate);
-    if (c) c.addEventListener("input", calcUpdate);
-    if (clr) clr.addEventListener("click", calcClear);
-  });
+  // Wire up directly — already inside DOMContentLoaded
+  const calcStartEl = document.getElementById("calc-start");
+  const calcCurEl   = document.getElementById("calc-current");
+  const calcClrBtn  = document.getElementById("calc-clear-btn");
+  if (calcStartEl) calcStartEl.addEventListener("input", calcUpdate);
+  if (calcCurEl)   calcCurEl.addEventListener("input", calcUpdate);
+  if (calcClrBtn)  calcClrBtn.addEventListener("click", calcClear);
 }
 </script>
 

@@ -2431,45 +2431,43 @@ function bindGoalButtons() {
   }
 
   // ── PREMIUM RETURN CALCULATOR ─────────────────────────
+  function setPremDays(d) {
+    document.getElementById("prem-days").value = d;
+    [7,14,21,30,45,60].forEach(n => {
+      const btn = document.getElementById("prem-d-" + n);
+      if (!btn) return;
+      btn.style.background   = n === d ? "#0d2a1a" : "#111520";
+      btn.style.borderColor  = n === d ? "#00C805" : "#1e2a40";
+      btn.style.color        = n === d ? "#00C805" : "#555";
+    });
+    premUpdate();
+  }
+
   function premUpdate() {
     const prem    = parseFloat(document.getElementById("prem-premium").value);
     const cap     = parseFloat(document.getElementById("prem-capital").value);
-    const expiry  = document.getElementById("prem-expiry").value;
+    const days    = parseInt(document.getElementById("prem-days").value);
     const result  = document.getElementById("prem-result");
     const clrBtn  = document.getElementById("prem-clear-btn");
-    const dayLbl  = document.getElementById("prem-days-label");
 
-    const hasAny = document.getElementById("prem-premium").value || document.getElementById("prem-capital").value || expiry;
+    const hasAny = document.getElementById("prem-premium").value || document.getElementById("prem-capital").value || document.getElementById("prem-days").value;
     clrBtn.style.display = hasAny ? "block" : "none";
 
-    let days = null;
-    if (expiry) {
-      const today = new Date(); today.setHours(0,0,0,0);
-      const exp   = new Date(expiry + "T00:00:00");
-      days = Math.round((exp - today) / 86400000);
-      dayLbl.textContent = days > 0 ? days + " days until expiry" : days === 0 ? "Expires today" : Math.abs(days) + " days ago";
-      dayLbl.style.color = days < 0 ? "var(--red)" : "#3a4a6a";
-    } else {
-      dayLbl.textContent = "";
-    }
-
-    if (isNaN(prem) || isNaN(cap) || cap === 0 || days === null) {
+    if (isNaN(prem) || isNaN(cap) || cap === 0 || isNaN(days) || days <= 0) {
       result.style.borderColor = "#1e2a40";
-      result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter premium, capital, and expiry</div>';
+      result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter premium, capital, and days held</div>';
       return;
     }
 
     const posPct  = (prem / cap) * 100;
-    const monthly = days > 0 ? (posPct / days) * 30 : 0;
-    const annual  = days > 0 ? (posPct / days) * 365 : 0;
-    const absDays = Math.abs(days);
-    const expired = days < 0;
+    const monthly = (posPct / days) * 30;
+    const annual  = (posPct / days) * 365;
 
     result.style.borderColor = "#1a3a1a";
     result.innerHTML = `
       <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:5px">Monthly Return</div>
       <div style="font-size:44px;font-weight:800;color:var(--green);letter-spacing:-2px;line-height:1;font-family:var(--font-display)">${monthly.toFixed(2)}%</div>
-      <div style="font-size:11px;color:var(--green);margin-top:5px;font-family:var(--font-mono)">$${prem.toFixed(0)} on $${cap.toLocaleString()} · ${absDays} days${expired ? " (expired)" : ""}</div>
+      <div style="font-size:11px;color:var(--green);margin-top:5px;font-family:var(--font-mono)">$${prem.toFixed(0)} on $${cap.toLocaleString()} · ${days} days</div>
       <div style="display:flex;gap:8px;margin-top:12px">
         <div style="flex:1;background:#0d1420;border:1px solid #1e2a40;border-radius:10px;padding:10px;text-align:center">
           <div style="font-family:var(--font-mono);font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:4px">Position Return</div>
@@ -2483,17 +2481,20 @@ function bindGoalButtons() {
       <div style="display:flex;justify-content:space-around;margin-top:12px;padding-top:12px;border-top:1px solid #1e2a40">
         <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Premium</div><div style="font-size:12px;color:#aabbcc;font-weight:700;margin-top:3px">$${prem.toFixed(0)}</div></div>
         <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Capital</div><div style="font-size:12px;color:#aabbcc;font-weight:700;margin-top:3px">$${cap.toLocaleString()}</div></div>
-        <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Days</div><div style="font-size:12px;color:#aabbcc;font-weight:700;margin-top:3px">${absDays}</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:7px;color:#3a4a6a;text-transform:uppercase;letter-spacing:1px">Days</div><div style="font-size:12px;color:#aabbcc;font-weight:700;margin-top:3px">${days}</div></div>
       </div>`;
   }
 
   function premClear() {
-    ["prem-premium","prem-capital","prem-expiry"].forEach(id => { const el = document.getElementById(id); if(el) el.value = ""; });
+    ["prem-premium","prem-capital","prem-days"].forEach(id => { const el = document.getElementById(id); if(el) el.value = ""; });
+    [7,14,21,30,45,60].forEach(n => {
+      const btn = document.getElementById("prem-d-" + n);
+      if (btn) { btn.style.background = "#111520"; btn.style.borderColor = "#1e2a40"; btn.style.color = "#555"; }
+    });
     document.getElementById("prem-clear-btn").style.display = "none";
-    document.getElementById("prem-days-label").textContent = "";
     const result = document.getElementById("prem-result");
     result.style.borderColor = "#1e2a40";
-    result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter premium, capital, and expiry</div>';
+    result.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter premium, capital, and days held</div>';
   }
 
   // ── CALC TAB TOGGLE ────────────────────────────────────
@@ -2612,8 +2613,17 @@ function bindGoalButtons() {
   window.calcSwitchTab = calcSwitchTab;
   window.calcClear     = calcClear;
   window.premClear     = premClear;
+  window.setPremDays   = setPremDays;
   window.tkrClear      = tkrClear;
   window.tkrSelectChip = tkrSelectChip;
+
+  // Wire up premium inputs
+  const premPremEl = document.getElementById("prem-premium");
+  const premCapEl  = document.getElementById("prem-capital");
+  const premDaysEl = document.getElementById("prem-days");
+  if (premPremEl)  premPremEl.addEventListener("input", premUpdate);
+  if (premCapEl)   premCapEl.addEventListener("input", premUpdate);
+  if (premDaysEl)  premDaysEl.addEventListener("input", premUpdate);
 
   // Wire up ticker inputs
   const tkrTickerEl  = document.getElementById("tkr-ticker");
@@ -3529,11 +3539,18 @@ service cloud.firestore {
         </div>
       </div>
       <div style="margin-bottom:12px">
-        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">Expiry Date</div>
-        <input id="prem-expiry" type="date"
-          style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:13px 12px;color:#aabbcc;font-size:15px;font-weight:600;outline:none;font-family:var(--font-display);appearance:none;-webkit-appearance:none"
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a7a;margin-bottom:5px">Days Held</div>
+        <input id="prem-days" type="number" inputmode="numeric" placeholder="e.g. 21" min="1" step="1"
+          style="width:100%;background:#111520;border:1px solid #1e2a40;border-radius:10px;padding:13px 12px;color:#fff;font-size:20px;font-weight:700;outline:none;text-align:center;font-family:var(--font-display)"
           onfocus="this.style.borderColor='#2e3a50'" onblur="this.style.borderColor='#1e2a40'"/>
-        <div id="prem-days-label" style="font-size:9px;color:#3a4a6a;margin-top:4px;text-align:right"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button onclick="setPremDays(7)"  style="flex:1;padding:7px 4px;background:#111520;border:1px solid #1e2a40;border-radius:8px;color:#555;font-size:11px;font-weight:700;cursor:pointer" id="prem-d-7">7</button>
+          <button onclick="setPremDays(14)" style="flex:1;padding:7px 4px;background:#111520;border:1px solid #1e2a40;border-radius:8px;color:#555;font-size:11px;font-weight:700;cursor:pointer" id="prem-d-14">14</button>
+          <button onclick="setPremDays(21)" style="flex:1;padding:7px 4px;background:#111520;border:1px solid #1e2a40;border-radius:8px;color:#555;font-size:11px;font-weight:700;cursor:pointer" id="prem-d-21">21</button>
+          <button onclick="setPremDays(30)" style="flex:1;padding:7px 4px;background:#111520;border:1px solid #1e2a40;border-radius:8px;color:#555;font-size:11px;font-weight:700;cursor:pointer" id="prem-d-30">30</button>
+          <button onclick="setPremDays(45)" style="flex:1;padding:7px 4px;background:#111520;border:1px solid #1e2a40;border-radius:8px;color:#555;font-size:11px;font-weight:700;cursor:pointer" id="prem-d-45">45</button>
+          <button onclick="setPremDays(60)" style="flex:1;padding:7px 4px;background:#111520;border:1px solid #1e2a40;border-radius:8px;color:#555;font-size:11px;font-weight:700;cursor:pointer" id="prem-d-60">60</button>
+        </div>
       </div>
       <div id="prem-result" style="background:#111520;border:1px solid #1e2a40;border-radius:12px;padding:20px;text-align:center;transition:border-color 0.3s">
         <div style="font-family:var(--font-mono);font-size:12px;color:#3a4a6a">Enter premium, capital, and expiry</div>

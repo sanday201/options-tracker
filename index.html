@@ -2617,6 +2617,14 @@ function bindGoalButtons() {
   window.tkrClear      = tkrClear;
   window.tkrSelectChip = tkrSelectChip;
 
+  // Wire up price change inputs
+  const calcStartEl = document.getElementById("calc-start");
+  const calcCurEl   = document.getElementById("calc-current");
+  const calcClrBtn  = document.getElementById("calc-clear-btn");
+  if (calcStartEl) calcStartEl.addEventListener("input", calcUpdate);
+  if (calcCurEl)   calcCurEl.addEventListener("input", calcUpdate);
+  if (calcClrBtn)  calcClrBtn.addEventListener("click", calcClear);
+
   // Wire up premium inputs
   const premPremEl = document.getElementById("prem-premium");
   const premCapEl  = document.getElementById("prem-capital");

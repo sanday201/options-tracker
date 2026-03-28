@@ -2465,13 +2465,13 @@ function bindGoalButtons() {
 
     result.style.borderColor = "#1a3a1a";
     result.innerHTML = `
-      <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:5px">Monthly Return</div>
-      <div style="font-size:44px;font-weight:800;color:var(--green);letter-spacing:-2px;line-height:1;font-family:var(--font-display)">${monthly.toFixed(2)}%</div>
+      <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:5px">Position Return</div>
+      <div style="font-size:44px;font-weight:800;color:var(--green);letter-spacing:-2px;line-height:1;font-family:var(--font-display)">${posPct.toFixed(2)}%</div>
       <div style="font-size:11px;color:var(--green);margin-top:5px;font-family:var(--font-mono)">$${prem.toFixed(0)} on $${cap.toLocaleString()} · ${days} days</div>
       <div style="display:flex;gap:8px;margin-top:12px">
         <div style="flex:1;background:#0d1420;border:1px solid #1e2a40;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-family:var(--font-mono);font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:4px">Position Return</div>
-          <div style="font-size:15px;font-weight:800;color:#00d4f5">${posPct.toFixed(2)}%</div>
+          <div style="font-family:var(--font-mono);font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:4px">Monthly Return</div>
+          <div style="font-size:15px;font-weight:800;color:#00d4f5">${monthly.toFixed(2)}%</div>
         </div>
         <div style="flex:1;background:#0d1420;border:1px solid #1e2a40;border-radius:10px;padding:10px;text-align:center">
           <div style="font-family:var(--font-mono);font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#3a4a6a;margin-bottom:4px">Annualized</div>

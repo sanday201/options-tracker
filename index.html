@@ -833,7 +833,11 @@ function renderPaceAndGoal() {
   const dailyTarget = Math.round((goalTarget / 365) / 50) * 50;
   setPace("pace-dayinfo", "Day " + dayOfMonth + " of " + daysInMonth + " · $" + dailyTarget.toLocaleString() + "/day target");
   setPace("pace-cur", fmt(s.mtd));
+  const paceCurEl = document.getElementById("pace-cur");
+  if (paceCurEl) paceCurEl.style.color = s.mtd < 0 ? "var(--red)" : "var(--cyan)";
   setPace("pace-proj", fmt(projected));
+  const paceProjEl = document.getElementById("pace-proj");
+  if (paceProjEl) paceProjEl.style.color = projected < 0 ? "var(--red)" : "var(--green)";
   setPace("pace-done-lbl", dayOfMonth + " days done");
   setPace("pace-rem-lbl", (daysInMonth - dayOfMonth) + " days left");
 
@@ -985,14 +989,14 @@ function renderKPIs() {
   document.getElementById("ytd-big").style.color = s.ytdNet >= 0 ? "var(--green)" : "var(--red)";
   animateValue(document.getElementById("ytd-big"), 0, s.ytdNet, 1200);
   document.getElementById("header-sub").textContent = `${s.trades} trades · Avg $${s.avgDay.toFixed(0)}/day`;
-  setKPI("k-ytd", fmt(s.ytdNet), "Gross: "+fmt(s.ytdGross)+" · Fees: "+fmt(s.ytdFees));
-  setKPI("k-mtd", fmt(s.mtd), "This month");
-  setKPI("k-worst", (s.minTrade < 0 ? "-" : "")+"$"+Math.abs(s.minTrade).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}), "Worst trade");
+  setKPI("k-ytd", fmt(s.ytdNet), "Gross: "+fmt(s.ytdGross)+" · Fees: "+fmt(s.ytdFees), s.ytdNet);
+  setKPI("k-mtd", fmt(s.mtd), "This month", s.mtd);
+  setKPI("k-worst", (s.minTrade < 0 ? "-" : "")+"$"+Math.abs(s.minTrade).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}), "Worst trade", s.minTrade);
   setKPI("k-trades", s.trades, "Total trades");
-  setKPI("k-avg", "$"+s.avgTrade.toFixed(2), "Per trade");
-  setKPI("k-max", fmt(s.maxTrade), "Best trade");
-  setKPI("k-day", "$"+s.avgDay.toFixed(2), "Per calendar day");
-  setKPI("k-hour", "$"+s.avgHour.toFixed(2), "Per hour (÷24)");
+  setKPI("k-avg", "$"+s.avgTrade.toFixed(2), "Per trade", s.avgTrade);
+  setKPI("k-max", fmt(s.maxTrade), "Best trade", s.maxTrade);
+  setKPI("k-day", "$"+s.avgDay.toFixed(2), "Per calendar day", s.avgDay);
+  setKPI("k-hour", "$"+s.avgHour.toFixed(2), "Per hour (÷24)", s.avgHour);
   const winTrades = allTrades.filter(t => t.net > 0).length;
   // Win rate ring
   const winValEl = document.getElementById("winrate-val");
@@ -1035,10 +1039,16 @@ function renderKPIs() {
   });
 }
 
-function setKPI(id, val, sub) {
+function setKPI(id, val, sub, numVal) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.querySelector(".kpi-val").textContent = val;
+  const valEl = el.querySelector(".kpi-val");
+  valEl.textContent = val;
+  if (numVal !== undefined) {
+    valEl.style.color = numVal < 0 ? "var(--red)" : numVal > 0 ? "var(--green)" : "";
+    el.className = el.className.replace(/kpi-green|kpi-red/g, "").trim();
+    el.classList.add(numVal < 0 ? "kpi-red" : "kpi-green");
+  }
   el.querySelector(".kpi-sub").textContent = sub;
 }
 
@@ -1830,6 +1840,7 @@ function tickUpKPIs() {
       else {
         const finalSign = val < 0 ? "-" : "";
         valEl.textContent = finalSign + prefix + Math.abs(val).toLocaleString("en-US",{minimumFractionDigits:decimals,maximumFractionDigits:decimals});
+        if (prefix === "$") valEl.style.color = val < 0 ? "var(--red)" : val > 0 ? "var(--green)" : "";
       }
     };
     requestAnimationFrame(step);

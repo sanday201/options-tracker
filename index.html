@@ -978,7 +978,7 @@ function renderTickerTape() {
 
 function renderKPIs() {
   const s = computeStats();
-  const fmt = n => "$"+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmt = n => (n < 0 ? "-$" : "$")+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   // Remove skeleton on first real render
   document.querySelectorAll(".kpi-val,.kpi-sub").forEach(el => el.classList.remove("skeleton"));
   document.getElementById("ytd-big").classList.remove("skeleton");
@@ -1023,6 +1023,8 @@ function renderKPIs() {
   if (mtdEl) {
     mtdEl.querySelector(".kpi-val").textContent = fmt(s.mtd);
     mtdEl.querySelector(".kpi-sub").innerHTML = "vs last month " + mtdBadge;
+    mtdEl.className = mtdEl.className.replace(/kpi-green|kpi-red/g, "").trim();
+    mtdEl.classList.add(s.mtd >= 0 ? "kpi-green" : "kpi-red");
   }
   updateDailyBanner();
   // Staggered reveal
@@ -1822,9 +1824,13 @@ function tickUpKPIs() {
       const p = Math.min((ts - start) / dur, 1);
       const ease = 1 - Math.pow(1 - p, 3);
       const cur = val * ease;
-      valEl.textContent = prefix + Math.abs(cur).toLocaleString("en-US",{minimumFractionDigits:decimals,maximumFractionDigits:decimals});
+      const sign = cur < 0 ? "-" : "";
+      valEl.textContent = sign + prefix + Math.abs(cur).toLocaleString("en-US",{minimumFractionDigits:decimals,maximumFractionDigits:decimals});
       if (p < 1) requestAnimationFrame(step);
-      else valEl.textContent = prefix + Math.abs(val).toLocaleString("en-US",{minimumFractionDigits:decimals,maximumFractionDigits:decimals});
+      else {
+        const finalSign = val < 0 ? "-" : "";
+        valEl.textContent = finalSign + prefix + Math.abs(val).toLocaleString("en-US",{minimumFractionDigits:decimals,maximumFractionDigits:decimals});
+      }
     };
     requestAnimationFrame(step);
   };
